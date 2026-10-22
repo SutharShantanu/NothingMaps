@@ -30,6 +30,17 @@ object HealthConnect {
 
     fun requestContract() = PermissionController.createRequestPermissionResultContract()
 
+    /** Forgets the grant on the Health Connect side too, so "off" really disconnects. */
+    suspend fun disconnect(context: Context) {
+        if (!available(context)) return
+        runCatching { HealthConnectClient.getOrCreate(context).permissionController.revokeAllPermissions() }
+    }
+
+    /** Health Connect's own page for this app: see and change what it may read. */
+    fun openSettings(context: Context) {
+        runCatching { context.startActivity(android.content.Intent(HealthConnectClient.ACTION_HEALTH_CONNECT_SETTINGS)) }
+    }
+
     suspend fun granted(context: Context): Boolean =
         available(context) && HealthConnectClient.getOrCreate(context).permissionController.getGrantedPermissions().containsAll(permissions)
 

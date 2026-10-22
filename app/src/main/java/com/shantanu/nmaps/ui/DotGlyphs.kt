@@ -120,6 +120,20 @@ object Glyphs {
             "..#..",
         )
     )
+    /** The app icon's pin, as the destination marker draws it. */
+    val PinLarge = DotGlyph(
+        listOf(
+            "...###...",
+            ".#######.",
+            "###...###",
+            "##..r..##",
+            "###...###",
+            ".#######.",
+            "..#####..",
+            "...###...",
+            "....#....",
+        )
+    )
     val Home = DotGlyph(
         listOf(
             "...#...",

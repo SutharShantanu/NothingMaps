@@ -86,7 +86,11 @@ fun TimelineSheet(vm: MapViewModel) {
                 )
             }
             ui.loading -> SkeletonRows(3, Modifier.padding(vertical = 12.dp))
-            ui.segments.isEmpty() -> EmptyState(Glyphs.Clock, "Quiet day", "No places or trips were saved on this day.", compact = true)
+            ui.segments.isEmpty() -> EmptyState(
+                Glyphs.Clock, "Quiet day",
+                if (vm.timeline.isToday) "No places or trips saved yet today." else "No places or trips were saved on this day. History starts from when Timeline was switched on.",
+                compact = true,
+            )
             else -> LazyColumn(Modifier.heightIn(max = 300.dp)) {
                 itemsIndexed(ui.segments) { i, seg ->
                     Column(Modifier.animateItem()) {
@@ -160,9 +164,17 @@ private fun HealthRow(vm: MapViewModel) {
     val p = LocalPalette.current
     val h = vm.timeline.ui.health
     val time = DateFormat.getTimeInstance(DateFormat.SHORT)
-    if (!vm.state.settings.timeline && h == null) return
+    val connect = rememberHealthConnect(vm)
     when {
-        !vm.state.settings.health -> return
+        !vm.state.settings.health -> Row(
+            Modifier.fillMaxWidth().padding(bottom = 10.dp).background(p.surfaceRaised, androidx.compose.foundation.shape.RoundedCornerShape(18.dp)).padding(12.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            DotIcon(Glyphs.Steps, Modifier.size(18.dp))
+            Spacer(Modifier.width(12.dp))
+            NText("Show steps and workouts here from Health Connect.", NType.caption, Modifier.weight(1f))
+            Pill("Connect", connect, style = PillStyle.Filled, height = 34.dp)
+        }
         h == null -> NText("Activity from Health Connect isn't available right now.", NType.caption, Modifier.padding(bottom = 8.dp), color = p.muted)
         else -> Column(Modifier.fillMaxWidth().padding(bottom = 10.dp).background(p.surfaceRaised, androidx.compose.foundation.shape.RoundedCornerShape(18.dp)).padding(12.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {

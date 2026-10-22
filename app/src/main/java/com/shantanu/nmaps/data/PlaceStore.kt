@@ -42,6 +42,8 @@ class PlaceStore(context: Context) {
 
     fun setShortcut(kind: Shortcut, place: Place) = write(kind.key, listOf(place))
 
+    fun clearShortcut(kind: Shortcut) = write(kind.key, emptyList())
+
     fun parking(): Place? = read(KEY_PARKING).firstOrNull()
 
     fun setParking(place: Place?) = write(KEY_PARKING, listOfNotNull(place))

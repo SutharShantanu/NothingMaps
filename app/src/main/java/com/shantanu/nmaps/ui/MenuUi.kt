@@ -29,6 +29,8 @@ import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
 import com.shantanu.nmaps.MapViewModel
 import com.shantanu.nmaps.data.BaseMap
+import com.shantanu.nmaps.data.Shortcut
+import androidx.compose.foundation.layout.size
 import com.shantanu.nmaps.health.HealthConnect
 import com.shantanu.nmaps.record.RecStatus
 import com.shantanu.nmaps.record.Recorder
@@ -107,6 +109,19 @@ fun SettingsScreen(vm: MapViewModel) {
         }
 
         Spacer(Modifier.height(12.dp))
+        SectionLabel("Places", Modifier.padding(start = 8.dp))
+        listOf(Shortcut.Home to vm.state.home, Shortcut.Work to vm.state.work).forEach { (kind, place) ->
+            ListRow(
+                kind.label, { vm.changeShortcut(kind) },
+                place?.address?.ifBlank { null } ?: if (place != null) "Set" else "Not set. Tap to choose",
+                if (kind == Shortcut.Home) Glyphs.Home else Glyphs.Work,
+            ) {
+                if (place != null) RoundButton(Glyphs.Close, "Remove ${kind.label}", { vm.clearShortcut(kind) }, Modifier.size(40.dp), iconModifier = Modifier.size(12.dp))
+                else DotIcon(Glyphs.Edit, Modifier.size(16.dp), color = p.muted)
+            }
+        }
+
+        Spacer(Modifier.height(12.dp))
         SectionLabel("Map controls", Modifier.padding(start = 8.dp))
         ToggleRow("Zoom buttons", s.zoomButtons, { vm.updateSettings(s.copy(zoomButtons = it)) }, "+ and − on the map")
         ToggleRow("Scale bar", s.scaleBar, { vm.updateSettings(s.copy(scaleBar = it)) })
@@ -129,21 +144,17 @@ fun SettingsScreen(vm: MapViewModel) {
             },
             Glyphs.Clock,
         )
-        val healthPermission = rememberLauncherForActivityResult(HealthConnect.requestContract()) { granted ->
-            if (granted.containsAll(HealthConnect.permissions)) vm.setHealth(true) else vm.notify("Health Connect access wasn't allowed")
-        }
+        val connectHealth = rememberHealthConnect(vm)
         ToggleRow(
-            "Activity in Timeline", s.health,
-            { on ->
-                when {
-                    !on -> vm.setHealth(false)
-                    !HealthConnect.available(context) -> vm.notify("Health Connect isn't available on this phone")
-                    else -> healthPermission.launch(HealthConnect.permissions)
-                }
-            },
-            "Steps and workouts from Health Connect, where Google Fit and other apps keep them",
+            "Health Connect", s.health,
+            { on -> if (on) connectHealth() else vm.setHealth(false) },
+            if (s.health) "Connected. Steps and workouts show in Timeline; turn off to disconnect"
+            else "Connect to show steps and workouts in Timeline, from Google Fit and other apps",
             Glyphs.Steps,
         )
+        if (s.health && HealthConnect.available(context)) {
+            ListRow("Manage in Health Connect", { HealthConnect.openSettings(context) }, "See or change what Maps can read")
+        }
         ListRow("Clear search history", vm::clearSearchHistory, "${vm.state.recents.size} recent searches")
         ListRow(
             if (confirmWipe) "Tap again to delete all history" else "Delete all timeline history",
@@ -163,6 +174,19 @@ fun SettingsScreen(vm: MapViewModel) {
                 "routing.openstreetmap.de and nearby places to Overpass. Live sharing is end-to-end encrypted and relayed through ntfy.sh.",
             NType.caption, Modifier.padding(8.dp), color = p.muted,
         )
+    }
+}
+
+/** Asks Health Connect for read access and switches the setting on when granted. */
+@Composable
+fun rememberHealthConnect(vm: MapViewModel): () -> Unit {
+    val context = LocalContext.current
+    val launcher = rememberLauncherForActivityResult(HealthConnect.requestContract()) { granted ->
+        if (granted.containsAll(HealthConnect.permissions)) vm.setHealth(true) else vm.notify("Health Connect access wasn't allowed")
+    }
+    return {
+        if (HealthConnect.available(context)) launcher.launch(HealthConnect.permissions)
+        else vm.notify("Health Connect isn't available on this phone")
     }
 }
 

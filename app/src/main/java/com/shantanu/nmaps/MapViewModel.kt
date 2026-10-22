@@ -47,8 +47,11 @@ import com.shantanu.nmaps.nav.formatDistance
 import com.shantanu.nmaps.nav.spokenDistance
 import com.shantanu.nmaps.offline.Bounds
 import com.shantanu.nmaps.offline.OfflineMaps
+import com.shantanu.nmaps.photos.GeoPhoto
+import com.shantanu.nmaps.photos.PhotoInfo
 import com.shantanu.nmaps.photos.PhotoStore
 import com.shantanu.nmaps.map.PhotoMarker
+import com.shantanu.nmaps.health.HealthConnect
 import com.shantanu.nmaps.offline.engine.LiveTileSource
 import com.shantanu.nmaps.offline.engine.OfflineDbTileSource
 import com.shantanu.nmaps.offline.engine.OfflineRouteException
@@ -84,7 +87,7 @@ import java.io.File
 import java.util.Locale
 
 enum class Screen {
-    Map, Search, Place, Route, Nav, Saved, Record, PickOnMap,
+    Map, Search, Place, Route, Nav, Saved, Record, PickOnMap, Photo,
     Menu, Layers, Offline, OfflineSelect, Timeline, Share, Friend, Settings, Me, Report,
 }
 
@@ -137,8 +140,11 @@ data class UiState(
     val work: Place? = null,
     /** Set while search is picking a place for something other than just viewing it. */
     val pick: Pick? = null,
-    /** On the pick-on-map screen: the place under the crosshair, named by a reverse lookup. */
+    /** On the pick-on-map screen: the place under the pin, named by a reverse lookup. */
     val mapPick: Place? = null,
+    /** A gallery photo opened from the map, and what's known about it. */
+    val photo: GeoPhoto? = null,
+    val photoInfo: PhotoInfo? = null,
     val plan: Plan = Plan(),
 
     val travel: Travel = Travel.Drive,
@@ -439,6 +445,28 @@ class MapViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
+    /** A photo thumbnail tapped on the map: show it with its details in the sheet. */
+    fun openPhoto(id: Long) {
+        val photo = photos.photos.firstOrNull { it.id == id } ?: return
+        state = state.copy(screen = Screen.Photo, photo = photo, photoInfo = null, follow = Follow.None)
+        cameraChannel.trySend(CameraCommand.FlyTo(photo.point, 16.5))
+        placeJob?.cancel()
+        placeJob = viewModelScope.launch {
+            val info = photos.details(photo)
+            if (state.photo?.id == photo.id) state = state.copy(photoInfo = info)
+            val found = runCatching { Geocoder.reverse(photo.point) }.getOrNull()
+            val address = listOfNotNull(found?.name, found?.address).filter { it.isNotBlank() }.joinToString(", ").ifBlank { "No address found" }
+            if (state.photo?.id == photo.id) state = state.copy(photoInfo = info.copy(address = address))
+        }
+    }
+
+    fun directionsToPhoto() {
+        val photo = state.photo ?: return
+        val name = state.photoInfo?.address?.substringBefore(",")?.takeIf { it.isNotBlank() && it != "No address found" } ?: "Photo"
+        state = state.copy(place = Place(name, state.photoInfo?.address.orEmpty(), photo.lat, photo.lon), photo = null, photoInfo = null)
+        directions()
+    }
+
     /** Photos layer switched on from the layer sheet, once the gallery permission is granted. */
     fun enablePhotos() {
         setLayers(state.settings.layers.copy(photos = true))
@@ -516,9 +544,10 @@ class MapViewModel(app: Application) : AndroidViewModel(app) {
         if (!layers.photos) photoMarkers = emptyList()
     }
 
-    /** Health Connect toggle; the Settings page requests the permissions first. */
+    /** Health Connect toggle; the Settings page requests the permissions first. Off also revokes them. */
     fun setHealth(on: Boolean) {
         updateSettings(state.settings.copy(health = on))
+        if (!on) viewModelScope.launch { HealthConnect.disconnect(getApplication()) }
         if (state.screen == Screen.Timeline) timeline.load()
     }
 
@@ -643,6 +672,12 @@ class MapViewModel(app: Application) : AndroidViewModel(app) {
 
     fun changeShortcut(kind: Shortcut) {
         pickPlace(Pick.ForShortcut(kind))
+    }
+
+    fun clearShortcut(kind: Shortcut) {
+        store.clearShortcut(kind)
+        state = if (kind == Shortcut.Home) state.copy(home = null) else state.copy(work = null)
+        toast("${kind.label} removed")
     }
 
     private fun pickPlace(pick: Pick) {
@@ -1457,6 +1492,10 @@ class MapViewModel(app: Application) : AndroidViewModel(app) {
             Screen.PickOnMap -> {
                 placeJob?.cancel()
                 state.copy(screen = Screen.Search, mapPick = null)
+            }
+            Screen.Photo -> {
+                placeJob?.cancel()
+                state.copy(screen = Screen.Map, photo = null, photoInfo = null)
             }
             Screen.Record -> state.copy(screen = Screen.Map, finished = null, finishedTrack = emptyList())
             Screen.Place -> state.copy(screen = Screen.Map, place = null, results = if (state.category != null) state.results else emptyList())

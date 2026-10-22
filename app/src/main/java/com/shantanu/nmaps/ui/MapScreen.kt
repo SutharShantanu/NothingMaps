@@ -152,7 +152,7 @@ fun MapScreen(vm: MapViewModel) {
             onUserPan = vm::onUserPan,
             onTap = vm::onMapTap,
             onLongPress = vm::onLongPress,
-            onMarkerTap = { id -> if (id.startsWith("photo:")) openPhoto(context, id.removePrefix("photo:").toLong()) else vm.onMarkerTap(id) },
+            onMarkerTap = { id -> if (id.startsWith("photo:")) vm.openPhoto(id.removePrefix("photo:").toLong()) else vm.onMarkerTap(id) },
             onMeTap = vm::onMeTap,
             onAlternativeTap = vm::chooseRoute,
             onCameraIdle = vm::onCameraIdle,
@@ -235,6 +235,7 @@ fun MapScreen(vm: MapViewModel) {
                     Screen.Nav -> NavFooter(vm)
                     Screen.Record -> RecordSheet(vm, rec)
                     Screen.PickOnMap -> PickOnMapSheet(vm)
+                    Screen.Photo -> PhotoSheet(vm)
                     Screen.Layers -> LayersSheet(vm)
                     Screen.OfflineSelect -> OfflineSelectSheet(vm)
                     Screen.Timeline -> TimelineSheet(vm)
@@ -338,15 +339,7 @@ private fun overlays(vm: MapViewModel, s: UiState): MapOverlays {
             s.transit.getOrNull(s.transitIndex)?.legs?.filter { it.mode == com.shantanu.nmaps.transit.TransitMode.Walk }?.map { it.points }.orEmpty()
         else -> emptyList()
     }
-    return MapOverlays(alternatives, history, markers, if (s.screen in setOf(Screen.Map, Screen.Place, Screen.Timeline)) vm.photoMarkers else emptyList())
-}
-
-/** Opens a gallery photo in whatever app shows pictures, the gallery included. */
-private fun openPhoto(context: android.content.Context, id: Long) {
-    val uri = android.content.ContentUris.withAppendedId(android.provider.MediaStore.Images.Media.EXTERNAL_CONTENT_URI, id)
-    runCatching {
-        context.startActivity(android.content.Intent(android.content.Intent.ACTION_VIEW).setDataAndType(uri, "image/*").addFlags(android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION))
-    }
+    return MapOverlays(alternatives, history, markers, if (s.screen in setOf(Screen.Map, Screen.Place, Screen.Timeline, Screen.Photo)) vm.photoMarkers else emptyList())
 }
 
 private enum class TopSlot { Search, Route, Nav, Record, None }
@@ -411,9 +404,12 @@ private fun ScaleBar(zoom: Float, lat: Double, modifier: Modifier = Modifier) {
 /** The app's dot pin held over the map centre while picking a spot; its tip marks the point. */
 @Composable
 private fun PickPin() {
+    val p = LocalPalette.current
     Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-        // The glyph is 5 wide by 6 tall with the tip on the bottom row; lift it so the tip sits on the centre.
-        DotIcon(Glyphs.Pin, Modifier.size(width = 40.dp, height = 48.dp).offset(y = (-24).dp))
+        // A small shadow under the tip grounds the pin on the map.
+        Canvas(Modifier.size(14.dp)) { drawCircle(p.content.copy(alpha = 0.18f)) }
+        // The icon-sized pin is 9 dots square with the tip on the bottom row; lift it so the tip sits on the centre.
+        DotIcon(Glyphs.PinLarge, Modifier.size(72.dp).offset(y = (-36).dp), color = p.content, offColor = p.content.copy(alpha = 0.08f))
     }
 }
 

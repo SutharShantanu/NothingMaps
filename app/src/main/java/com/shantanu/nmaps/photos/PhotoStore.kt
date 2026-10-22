@@ -30,6 +30,21 @@ data class GeoPhoto(val id: Long, val lat: Double, val lon: Double, val time: Lo
     val uri get() = ContentUris.withAppendedId(MediaStore.Images.Media.EXTERNAL_CONTENT_URI, id)
 }
 
+/** What the gallery and the file's EXIF say about one picture. */
+data class PhotoInfo(
+    val id: Long,
+    val name: String,
+    val width: Int,
+    val height: Int,
+    val size: Long,
+    /** "Nothing Phone (3)" or similar. */
+    val camera: String?,
+    /** "f/1.8 · 1/120 s · ISO 100 · 24 mm". */
+    val exposure: String?,
+    /** Reverse-looked-up, filled in by the caller. */
+    val address: String? = null,
+)
+
 /**
  * Geotagged photos from the device gallery. Reading GPS from EXIF needs the original file, so the
  * result is cached per photo in a small JSON file; a scan only opens pictures it hasn't seen.
@@ -84,6 +99,49 @@ class PhotoStore(private val context: Context) {
         val original = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) MediaStore.setRequireOriginal(uri) else uri
         context.contentResolver.openInputStream(original)?.use { ExifInterface(it).latLong }
     }.getOrNull()?.takeIf { it[0] != 0.0 || it[1] != 0.0 }?.let { GeoPhoto(id, it[0], it[1], time) }
+
+    /** Name, dimensions and camera details for the photo sheet. */
+    suspend fun details(photo: GeoPhoto): PhotoInfo = withContext(Dispatchers.IO) {
+        var name = "Photo"
+        var width = 0
+        var height = 0
+        var size = 0L
+        runCatching {
+            context.contentResolver.query(
+                photo.uri,
+                arrayOf(MediaStore.Images.Media.DISPLAY_NAME, MediaStore.Images.Media.WIDTH, MediaStore.Images.Media.HEIGHT, MediaStore.Images.Media.SIZE),
+                null, null, null,
+            )?.use { c ->
+                if (c.moveToFirst()) {
+                    name = c.getString(0) ?: name; width = c.getInt(1); height = c.getInt(2); size = c.getLong(3)
+                }
+            }
+        }
+        val exif = runCatching {
+            val original = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) MediaStore.setRequireOriginal(photo.uri) else photo.uri
+            context.contentResolver.openInputStream(original)?.use { ExifInterface(it) }
+        }.getOrNull()
+        val make = exif?.getAttribute(ExifInterface.TAG_MAKE)?.trim().orEmpty()
+        val model = exif?.getAttribute(ExifInterface.TAG_MODEL)?.trim().orEmpty()
+        val camera = listOf(make, model).filter { it.isNotBlank() }.distinct().joinToString(" ").ifBlank { null }
+        val exposure = exif?.let { e ->
+            listOfNotNull(
+                e.getAttributeDouble(ExifInterface.TAG_F_NUMBER, 0.0).takeIf { it > 0 }?.let { "f/${"%.1f".format(it)}" },
+                e.getAttributeDouble(ExifInterface.TAG_EXPOSURE_TIME, 0.0).takeIf { it > 0 }?.let { if (it < 1) "1/${(1 / it).toInt()} s" else "${"%.1f".format(it)} s" },
+                e.getAttributeInt(ExifInterface.TAG_PHOTOGRAPHIC_SENSITIVITY, 0).takeIf { it > 0 }?.let { "ISO $it" },
+                e.getAttributeDouble(ExifInterface.TAG_FOCAL_LENGTH, 0.0).takeIf { it > 0 }?.let { "${"%.0f".format(it)} mm" },
+            ).joinToString(" · ").ifBlank { null }
+        }
+        PhotoInfo(photo.id, name, width, height, size, camera, exposure)
+    }
+
+    /** A screen-sized rendition for the photo sheet. */
+    suspend fun preview(photo: GeoPhoto): Bitmap? = withContext(Dispatchers.IO) {
+        runCatching {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) context.contentResolver.loadThumbnail(photo.uri, Size(1200, 900), null)
+            else context.contentResolver.openInputStream(photo.uri)?.use { android.graphics.BitmapFactory.decodeStream(it) }
+        }.getOrNull()
+    }
 
     /** Photos inside [bounds], newest first, at most [max]. */
     fun inBounds(bounds: Bounds, max: Int = 80): List<GeoPhoto> =
