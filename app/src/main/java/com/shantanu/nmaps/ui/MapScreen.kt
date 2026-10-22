@@ -51,6 +51,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.rotate
+import androidx.compose.foundation.layout.offset
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.platform.LocalContext
@@ -162,7 +163,8 @@ fun MapScreen(vm: MapViewModel) {
         )
 
         if (s.screen == Screen.OfflineSelect) OfflineFrame()
-        if (s.screen == Screen.PickOnMap || (s.settings.coordinates && s.screen in setOf(Screen.Map, Screen.Report))) Crosshair()
+        // The pin only appears while choosing a spot on the map, its tip on the camera centre.
+        if (s.screen == Screen.PickOnMap) PickPin()
 
         Column(
             Modifier
@@ -179,9 +181,15 @@ fun MapScreen(vm: MapViewModel) {
                 when (slot) {
                     TopSlot.Search -> Column {
                         SearchBar(vm)
-                        AnimatedVisibility(s.screen == Screen.Map, enter = fadeIn(), exit = fadeOut()) { QuickChips(vm) }
-                        AnimatedVisibility(s.screen == Screen.Map && vm.mapWeather != null, enter = fadeIn(), exit = fadeOut()) {
-                            rememberLast(vm.mapWeather)?.let { WeatherBadge(it, Modifier.padding(top = 10.dp)) }
+                        Row(verticalAlignment = Alignment.Top) {
+                            Column(Modifier.weight(1f)) {
+                                AnimatedVisibility(s.screen == Screen.Map, enter = fadeIn(), exit = fadeOut()) { QuickChips(vm) }
+                                AnimatedVisibility(s.screen == Screen.Map && vm.mapWeather != null, enter = fadeIn(), exit = fadeOut()) {
+                                    rememberLast(vm.mapWeather)?.let { WeatherBadge(it, Modifier.padding(top = 10.dp)) }
+                                }
+                            }
+                            // Layers sits under the menu button, as in Google Maps.
+                            RoundButton(Glyphs.Layers, "Map layers", vm::openLayers, Modifier.padding(top = 10.dp))
                         }
                     }
                     TopSlot.Route -> RouteHeader(vm)
@@ -193,7 +201,6 @@ fun MapScreen(vm: MapViewModel) {
 
             AnimatedVisibility(!s.online && s.screen in setOf(Screen.Map, Screen.Place), enter = fadeIn(), exit = fadeOut()) { OfflineBanner() }
             CalibrationHint(vm)
-            if (s.settings.coordinates && s.screen == Screen.Map) CenterCoordinates(vm)
             AnimatedVisibility(s.message != null, enter = fadeIn(), exit = fadeOut()) {
                 val shown = rememberLast(s.message) ?: ""
                 Box(Modifier.fillMaxWidth().padding(top = 8.dp), contentAlignment = Alignment.Center) {
@@ -208,7 +215,7 @@ fun MapScreen(vm: MapViewModel) {
             Spacer(Modifier.weight(1f))
 
             if (s.screen !in setOf(Screen.Timeline, Screen.OfflineSelect, Screen.Share, Screen.Friend)) {
-                MapControls(vm = vm, showSpeed = s.screen == Screen.Nav, attribution = s.screen == Screen.Map)
+                MapControls(vm = vm, rec = rec, showSpeed = s.screen == Screen.Nav, attribution = s.screen == Screen.Map)
                 Spacer(Modifier.height(12.dp))
             }
 
@@ -401,39 +408,31 @@ private fun ScaleBar(zoom: Float, lat: Double, modifier: Modifier = Modifier) {
     }
 }
 
-/** Dot crosshair at the map centre, for reading coordinates. */
+/** The app's dot pin held over the map centre while picking a spot; its tip marks the point. */
 @Composable
-private fun Crosshair() {
-    val p = LocalPalette.current
-    Canvas(Modifier.fillMaxSize()) {
-        val c = center
-        val r = 1.8.dp.toPx()
-        for (i in listOf(-4, -3, -2, 2, 3, 4)) {
-            drawCircle(p.red, r, androidx.compose.ui.geometry.Offset(c.x + i * 5.dp.toPx(), c.y))
-            drawCircle(p.red, r, androidx.compose.ui.geometry.Offset(c.x, c.y + i * 5.dp.toPx()))
-        }
-        drawCircle(p.content, r * 1.4f, c)
+private fun PickPin() {
+    Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+        // The glyph is 5 wide by 6 tall with the tip on the bottom row; lift it so the tip sits on the centre.
+        DotIcon(Glyphs.Pin, Modifier.size(width = 40.dp, height = 48.dp).offset(y = (-24).dp))
     }
 }
 
 /** The centre's latitude and longitude; tap to copy, long-press to drop a pin there. */
 @Composable
-private fun CenterCoordinates(vm: MapViewModel) {
+private fun CenterCoordinates(vm: MapViewModel, modifier: Modifier = Modifier) {
     val p = LocalPalette.current
     val context = LocalContext.current
     val c = vm.cameraCenter ?: return
     val text = "%.5f, %.5f".format(java.util.Locale.US, c.lat, c.lon)
-    Box(Modifier.fillMaxWidth().padding(top = 8.dp), contentAlignment = Alignment.Center) {
-        NText(
-            text, NType.bodyStrong,
-            Modifier
-                .pressable(CircleShape, "Map centre $text. Tap to copy, hold to drop a pin", { vm.onLongPress(c) }) {
-                    copyText(context, text); vm.notify("Coordinates copied")
-                }
-                .background(p.surface, CircleShape)
-                .padding(horizontal = 16.dp, vertical = 8.dp),
-        )
-    }
+    NText(
+        text, NType.caption,
+        modifier
+            .pressable(CircleShape, "Map centre $text. Tap to copy, hold to drop a pin", { vm.onLongPress(c) }) {
+                copyText(context, text); vm.notify("Coordinates copied")
+            }
+            .background(p.surface, CircleShape)
+            .padding(horizontal = 12.dp, vertical = 6.dp),
+    )
 }
 
 /** The red directions button: opens the planner with your location as the start. */
@@ -462,31 +461,40 @@ private fun QuickChips(vm: MapViewModel) {
 }
 
 @Composable
-private fun MapControls(vm: MapViewModel, showSpeed: Boolean, attribution: Boolean) {
+private fun MapControls(vm: MapViewModel, rec: RecordState, showSpeed: Boolean, attribution: Boolean) {
     val s = vm.state
     val p = LocalPalette.current
     Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.Bottom) {
+        // Bottom-left: zoom, the centre's coordinates, the scale bar and attribution.
         Box(Modifier.weight(1f)) {
             if (showSpeed) SpeedCluster(s.fix?.speed ?: 0f, s.speedLimit)
-            else Column {
+            else Column(horizontalAlignment = Alignment.Start) {
+                if (s.settings.zoomButtons) {
+                    Column(Modifier.padding(bottom = 10.dp).background(p.surface, CircleShape)) {
+                        RoundButton(Glyphs.Plus, "Zoom in", { vm.zoom(1.0) }, iconModifier = Modifier.size(14.dp))
+                        RoundButton(Glyphs.Minus, "Zoom out", { vm.zoom(-1.0) }, iconModifier = Modifier.size(14.dp))
+                    }
+                }
+                if (s.settings.coordinates && s.screen == Screen.Map) CenterCoordinates(vm, Modifier.padding(bottom = 8.dp))
                 if (s.settings.scaleBar && s.screen in setOf(Screen.Map, Screen.Place, Screen.Me)) {
                     ScaleBar(vm.cameraZoom, vm.cameraCenter?.lat ?: 0.0, Modifier.padding(start = 6.dp, bottom = 6.dp))
                 }
                 if (attribution) NText("© OpenStreetMap contributors", NType.caption, color = p.muted.copy(alpha = 0.7f), modifier = Modifier.padding(start = 6.dp, bottom = 4.dp))
             }
         }
+        // Bottom-right, top to bottom: north (when turned), activity, my location, directions.
         Column(horizontalAlignment = Alignment.End, verticalArrangement = Arrangement.spacedBy(10.dp)) {
             AnimatedVisibility(abs(vm.bearing) > 1f, enter = scaleIn() + fadeIn(), exit = scaleOut() + fadeOut()) {
                 RoundButton(Glyphs.North, "Point north", vm::resetNorth, iconModifier = Modifier.rotate(-vm.bearing))
             }
-            if (s.settings.zoomButtons && s.screen != Screen.Nav) {
-                Column(Modifier.background(p.surface, CircleShape)) {
-                    RoundButton(Glyphs.Plus, "Zoom in", { vm.zoom(1.0) }, iconModifier = Modifier.size(14.dp))
-                    RoundButton(Glyphs.Minus, "Zoom out", { vm.zoom(-1.0) }, iconModifier = Modifier.size(14.dp))
-                }
+            if (s.screen == Screen.Map) {
+                RoundButton(
+                    Glyphs.Steps,
+                    if (rec.status != RecStatus.Idle) "Recording ${rec.sport.label.lowercase()}: ${formatClock(rec.movingMs)}" else "Record an activity",
+                    vm::openRecord,
+                    active = rec.status != RecStatus.Idle,
+                )
             }
-            if (s.screen != Screen.Nav) RoundButton(Glyphs.Layers, "Map layers", vm::openLayers)
-            if (s.screen == Screen.Map) DirectionsButton(vm::openPlanner)
             if (s.hasLocation) {
                 RoundButton(
                     if (s.follow == Follow.Compass) Glyphs.Heading else Glyphs.Locate,
@@ -499,6 +507,7 @@ private fun MapControls(vm: MapViewModel, showSpeed: Boolean, attribution: Boole
                     active = s.follow != Follow.None,
                 )
             }
+            if (s.screen == Screen.Map) DirectionsButton(vm::openPlanner)
         }
     }
 }
@@ -563,21 +572,14 @@ private fun CalibrationHint(vm: MapViewModel) {
 private fun Shortcuts(vm: MapViewModel, rec: RecordState) {
     val s = vm.state
     LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
-        item {
-            if (rec.status != RecStatus.Idle) {
-                val d = formatDistance(rec.distance)
-                Pill("${formatClock(rec.movingMs)}   ${d.value} ${d.unit}", vm::openRecord, style = PillStyle.Filled, glyph = Glyphs.Record, height = 44.dp)
-            } else {
-                Pill("Record", vm::openRecord, style = PillStyle.Tonal, glyph = Glyphs.Record, height = 44.dp)
-            }
+        if (rec.status != RecStatus.Idle) item {
+            val d = formatDistance(rec.distance)
+            Pill("${formatClock(rec.movingMs)}   ${d.value} ${d.unit}", vm::openRecord, style = PillStyle.Filled, glyph = Glyphs.Record, height = 44.dp)
         }
         s.category?.let { c -> item { Pill("Clear ${c.label.lowercase()}", vm::clearNearby, style = PillStyle.Filled, glyph = Glyphs.Close, height = 44.dp) } }
         if (s.parking != null) item { Pill("Parking", { vm.onMarkerTap("parking") }, style = PillStyle.Tonal, glyph = Glyphs.Parking, height = 44.dp) }
         items(vm.share.friends.filter { it.last != null }, key = { "f" + it.link.topic }) { f ->
             Pill(f.label, { vm.openFriend(f) }, style = PillStyle.Tonal, glyph = Glyphs.Person, height = 44.dp)
-        }
-        items(s.saved.take(6), key = { it.key }) { place ->
-            Pill(place.name, { vm.select(place) }, style = PillStyle.Tonal, height = 44.dp)
         }
     }
 }

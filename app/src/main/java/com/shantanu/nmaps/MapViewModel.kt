@@ -477,6 +477,8 @@ class MapViewModel(app: Application) : AndroidViewModel(app) {
     /** "Choose on map" from the picker: the crosshair picks the spot, the sheet confirms it. */
     fun pickOnMap() {
         state = state.copy(screen = Screen.PickOnMap, follow = Follow.None, mapPick = null)
+        // Name the spot already under the pin; the camera won't settle again until the user moves it.
+        cameraCenter?.let(::resolveMapPick)
     }
 
     private fun resolveMapPick(at: LatLon) {
