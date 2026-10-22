@@ -98,8 +98,8 @@ fun SettingsScreen(vm: MapViewModel) {
 
     Page("Settings", { vm.back() }) {
         SectionLabel("Navigation", Modifier.padding(start = 8.dp, top = 4.dp))
-        ToggleRow("Voice guidance", s.voice, { vm.updateSettings(s.copy(voice = it)) }, "Spoken turns and off-route warnings")
-        ToggleRow("Night map in the dark", s.autoNight, { vm.updateSettings(s.copy(autoNight = it)) }, "Uses the light sensor while navigating")
+        ToggleRow("Voice guidance", s.voice, { vm.updateSettings(s.copy(voice = it)) }, "Spoken turns and off-route warnings", Glyphs.Mic)
+        ToggleRow("Night map in the dark", s.autoNight, { vm.updateSettings(s.copy(autoNight = it)) }, "Uses the light sensor while navigating", Glyphs.Moon)
         Spacer(Modifier.height(4.dp))
         Column(Modifier.padding(horizontal = 8.dp, vertical = 8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             NText("Distance units", NType.bodyStrong)
@@ -127,6 +127,7 @@ fun SettingsScreen(vm: MapViewModel) {
                 hasBackground() -> "Saving history, also while the app is closed"
                 else -> "Saving while the app is open. Allow location \"all the time\" to save in the background"
             },
+            Glyphs.Clock,
         )
         val healthPermission = rememberLauncherForActivityResult(HealthConnect.requestContract()) { granted ->
             if (granted.containsAll(HealthConnect.permissions)) vm.setHealth(true) else vm.notify("Health Connect access wasn't allowed")
@@ -141,6 +142,7 @@ fun SettingsScreen(vm: MapViewModel) {
                 }
             },
             "Steps and workouts from Health Connect, where Google Fit and other apps keep them",
+            Glyphs.Steps,
         )
         ListRow("Clear search history", vm::clearSearchHistory, "${vm.state.recents.size} recent searches")
         ListRow(
@@ -172,10 +174,10 @@ fun LayersSheet(vm: MapViewModel) {
         Spacer(Modifier.height(12.dp))
         Segmented(BaseMap.entries, layers.base, { it.label }) { vm.setLayers(layers.copy(base = it)) }
         Spacer(Modifier.height(8.dp))
-        ToggleRow("Terrain", layers.terrain, { vm.setLayers(layers.copy(terrain = it)) }, "Hill shading from elevation data")
-        ToggleRow("Transit", layers.transit, { vm.setLayers(layers.copy(transit = it)) }, "Rail lines and stations")
-        ToggleRow("Cycling", layers.cycling, { vm.setLayers(layers.copy(cycling = it)) }, "Cycleways and bike-friendly roads")
-        ToggleRow("3D buildings", layers.buildings3d, { vm.setLayers(layers.copy(buildings3d = it)) }, "Tilt the map with two fingers to see them")
+        ToggleRow("Terrain", layers.terrain, { vm.setLayers(layers.copy(terrain = it)) }, "Hill shading from elevation data", Glyphs.Terrain)
+        ToggleRow("Transit", layers.transit, { vm.setLayers(layers.copy(transit = it)) }, "Rail lines and stations", Glyphs.Train)
+        ToggleRow("Cycling", layers.cycling, { vm.setLayers(layers.copy(cycling = it)) }, "Cycleways and bike-friendly roads", Glyphs.Bike)
+        ToggleRow("3D buildings", layers.buildings3d, { vm.setLayers(layers.copy(buildings3d = it)) }, "Tilt the map with two fingers to see them", Glyphs.Building)
         val mediaPermission = rememberLauncherForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) {
             if (vm.photos.hasPermission()) vm.enablePhotos() else vm.notify("Photos need access to the gallery")
         }
@@ -189,6 +191,7 @@ fun LayersSheet(vm: MapViewModel) {
                 }
             },
             "Pictures from your gallery where they were taken; tap one to open it",
+            Glyphs.Camera,
         )
         NText(
             "Live traffic isn't available: there's no free, open source for it.",

@@ -165,14 +165,18 @@ private fun HealthRow(vm: MapViewModel) {
         !vm.state.settings.health -> return
         h == null -> NText("Activity from Health Connect isn't available right now.", NType.caption, Modifier.padding(bottom = 8.dp), color = p.muted)
         else -> Column(Modifier.fillMaxWidth().padding(bottom = 10.dp).background(p.surfaceRaised, androidx.compose.foundation.shape.RoundedCornerShape(18.dp)).padding(12.dp)) {
-            Row(verticalAlignment = Alignment.Bottom) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                DotIcon(Glyphs.Steps, Modifier.size(22.dp))
+                Spacer(Modifier.width(12.dp))
                 Readout("%,d".format(h.steps), "steps", valueStyle = NType.dotMedium)
                 Spacer(Modifier.weight(1f))
                 NText("Health Connect", NType.caption, color = p.muted)
             }
             h.sessions.forEach { s ->
-                Row(Modifier.padding(top = 6.dp)) {
-                    NText("${time.format(Date(s.start))} – ${time.format(Date(s.end))}", NType.caption, Modifier.width(118.dp), color = p.muted)
+                Row(Modifier.padding(top = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+                    DotIcon(Glyphs.Record, Modifier.size(16.dp), color = p.muted)
+                    Spacer(Modifier.width(12.dp))
+                    NText("${time.format(Date(s.start))} – ${time.format(Date(s.end))}", NType.caption, Modifier.width(110.dp), color = p.muted)
                     NText("${s.label}, ${formatDuration((s.end - s.start) / 1000.0).joinToString(" ")}", NType.caption, Modifier.weight(1f))
                 }
             }

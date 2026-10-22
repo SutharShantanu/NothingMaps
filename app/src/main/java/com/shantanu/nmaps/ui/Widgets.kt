@@ -64,16 +64,16 @@ fun WeatherBadge(c: com.shantanu.nmaps.data.Conditions, modifier: Modifier = Mod
     val aqi = c.aqi
     Row(
         modifier
-            .height(36.dp)
+            .height(44.dp)
             .background(p.surface, CircleShape)
             .border(1.dp, p.line, CircleShape)
-            .padding(horizontal = 12.dp)
+            .padding(start = 12.dp, end = 14.dp)
             .semantics { contentDescription = "${c.temperature}, ${c.sky.name.lowercase()}" + (aqi?.let { ", air quality $it, ${com.shantanu.nmaps.data.Weather.aqiLabel(it)}" } ?: "") },
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        DotIcon(glyph, Modifier.size(16.dp))
-        Spacer(Modifier.width(8.dp))
-        NText(c.temperature, NType.dotLabel)
+        DotIcon(glyph, Modifier.size(26.dp), offColor = p.line)
+        Spacer(Modifier.width(10.dp))
+        NText(c.temperature, NType.dotMedium)
         if (aqi != null) {
             Spacer(Modifier.width(10.dp))
             val tone = when {
