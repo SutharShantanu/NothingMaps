@@ -1,0 +1,84 @@
+name: Android
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: android-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: Build and test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+
+      # The runner ships an SDK; add the platform this app compiles against (setup-android trips over preview licences).
+      - name: Android platform 37
+        run: |
+          yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --licenses >/dev/null || true
+          "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --install "platforms;android-37.0" "build-tools;36.0.0" >/dev/null
+
+      - uses: gradle/actions/setup-gradle@v4
+
+      - name: Unit tests
+        run: ./gradlew :app:testDebugUnitTest --no-daemon --console=plain
+
+      - name: Build APKs
+        run: ./gradlew :app:assembleDebug :app:assembleRelease --no-daemon --console=plain
+
+      - name: Name the APKs after the build
+        run: |
+          mkdir -p out
+          cp app/build/outputs/apk/debug/app-debug.apk out/maps-debug-${{ github.run_number }}.apk
+          cp app/build/outputs/apk/release/app-release.apk out/maps-release-${{ github.run_number }}.apk
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: apks
+          path: out/*.apk
+          if-no-files-found: error
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: test-results
+          path: app/build/test-results/testDebugUnitTest/*.xml
+          if-no-files-found: ignore
+
+  release:
+    name: Release
+    # Only after a green build, and only for commits on master (not pull requests).
+    needs: build
+    if: success() && github.event_name != 'pull_request' && github.ref == 'refs/heads/master'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: apks
+          path: out
+
+      - name: Version from build.gradle.kts
+        id: v
+        run: echo "name=$(grep -o 'versionName = "[^"]*"' app/build.gradle.kts | cut -d'"' -f2)" >> "$GITHUB_OUTPUT"
+
+      - uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v${{ steps.v.outputs.name }}-build.${{ github.run_number }}
+          name: Maps ${{ steps.v.outputs.name }} (build ${{ github.run_number }})
+          generate_release_notes: true
+          files: out/*.apk

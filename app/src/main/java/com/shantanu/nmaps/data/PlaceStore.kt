@@ -12,9 +12,16 @@ class PlaceStore(context: Context) {
     fun saved(): List<Place> = read(KEY_SAVED)
     fun recents(): List<Place> = read(KEY_RECENTS)
 
-    fun toggleSaved(place: Place): List<Place> {
+    /** Adds [place] to Saved, or replaces the entry at the same spot (so a rename is a save). */
+    fun save(place: Place): List<Place> {
         val current = saved()
-        val next = if (current.any { it.key == place.key }) current.filterNot { it.key == place.key } else listOf(place) + current
+        val next = if (current.any { it.key == place.key }) current.map { if (it.key == place.key) place else it } else listOf(place) + current
+        write(KEY_SAVED, next)
+        return next
+    }
+
+    fun unsave(key: String): List<Place> {
+        val next = saved().filterNot { it.key == key }
         write(KEY_SAVED, next)
         return next
     }
@@ -34,6 +41,8 @@ class PlaceStore(context: Context) {
     fun shortcut(kind: Shortcut): Place? = read(kind.key).firstOrNull()
 
     fun setShortcut(kind: Shortcut, place: Place) = write(kind.key, listOf(place))
+
+    fun clearShortcut(kind: Shortcut) = write(kind.key, emptyList())
 
     fun parking(): Place? = read(KEY_PARKING).firstOrNull()
 

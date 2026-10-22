@@ -69,8 +69,6 @@ data class Route(
     val steps: List<Step>,
     /** Main road, e.g. "via NH 48", to tell alternatives apart. */
     val via: String = "",
-    /** Following an imported GPX track rather than a computed route. */
-    val isTrack: Boolean = false,
     /** Index in [steps] of each leg's final "arrive" step; one leg per stop plus the last. */
     val legEnds: List<Int> = emptyList(),
     /** Road types the route uses, as OSRM reports them: "toll", "motorway", "ferry". */

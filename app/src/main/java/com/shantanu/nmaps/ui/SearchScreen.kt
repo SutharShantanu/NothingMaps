@@ -27,7 +27,10 @@ import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
@@ -108,6 +111,14 @@ fun SearchScreen(vm: MapViewModel) {
             if (s.pick == Pick.Start && s.query.isBlank() && s.fix != null) {
                 item {
                     ListRow("Your location", vm::useMyLocationAsStart, "Start from where you are now", Glyphs.Locate)
+                }
+            }
+            if (s.pick != null && s.query.isBlank()) {
+                item { ListRow("Choose on map", vm::pickOnMap, "Drop a pin anywhere", Glyphs.Pin) }
+                val saved = listOfNotNull(s.home, s.work) + s.saved
+                if (saved.isNotEmpty()) {
+                    item { SectionLabel("Saved", Modifier.padding(top = 8.dp, bottom = 8.dp)) }
+                    items(saved, key = { "saved-" + it.key }) { PlaceRow(it, Glyphs.StarOn, s.fix, Modifier.animateItem()) { vm.select(it) } }
                 }
             }
             if (s.query.isBlank()) {
@@ -203,7 +214,11 @@ fun SavedScreen(vm: MapViewModel) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             RoundButton(Glyphs.Back, "Back", { vm.back() }, Modifier.size(56.dp))
             Spacer(Modifier.width(16.dp))
-            NText("SAVED", NType.dotLarge)
+            NText("SAVED", NType.dotLarge, Modifier.weight(1f))
+            if (s.saved.isNotEmpty()) {
+                val context = androidx.compose.ui.platform.LocalContext.current
+                Pill("GPX", { vm.exportSaved()?.let { shareFile(context, it, title = "Export saved places") } }, glyph = Glyphs.Share, height = 40.dp)
+            }
         }
         Spacer(Modifier.height(20.dp))
         LazyColumn(Modifier.fillMaxSize().padding(horizontal = 8.dp)) {
@@ -211,9 +226,17 @@ fun SavedScreen(vm: MapViewModel) {
                 item { EmptyState(Glyphs.Star, "Nothing saved", "Open any place and tap Save to keep it here, one tap away.") }
             } else {
                 items(s.saved, key = { it.key }) { place ->
-                    Row(Modifier.animateItem(), verticalAlignment = Alignment.CenterVertically) {
-                        Box(Modifier.weight(1f)) { PlaceRow(place, Glyphs.StarOn, s.fix) { vm.select(place) } }
-                        RoundButton(Glyphs.Close, "Remove ${place.name}", { vm.toggleSaved(place) }, Modifier.padding(start = 8.dp).size(40.dp), iconModifier = Modifier.size(12.dp))
+                    var renaming by remember(place.key) { mutableStateOf(false) }
+                    Column(Modifier.animateItem()) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Box(Modifier.weight(1f)) { PlaceRow(place, Glyphs.StarOn, s.fix) { vm.select(place) } }
+                            RoundButton(Glyphs.Edit, "Rename ${place.name}", { renaming = !renaming }, Modifier.padding(start = 8.dp).size(40.dp), iconModifier = Modifier.size(14.dp))
+                            RoundButton(Glyphs.Close, "Remove ${place.name}", { vm.unsave(place) }, Modifier.padding(start = 8.dp).size(40.dp), iconModifier = Modifier.size(12.dp))
+                        }
+                        if (renaming) {
+                            NameEditor(place.name, "Name this place", onSave = { vm.savePlace(place, it); renaming = false }, onCancel = { renaming = false },
+                                Modifier.padding(start = 34.dp, top = 4.dp, bottom = 12.dp))
+                        }
                     }
                 }
             }

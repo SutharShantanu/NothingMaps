@@ -85,8 +85,6 @@ fun NavBanner(s: UiState) {
             DotIcon(
                 when {
                     nav.arrived -> Glyphs.Arrive
-                    nav.offTrack -> Glyphs.Warning
-                    route.isTrack -> Glyphs.Straight
                     else -> glyphFor(step)
                 },
                 Modifier.size(84.dp),
@@ -100,14 +98,6 @@ fun NavBanner(s: UiState) {
                 if (nav.arrived) {
                     NText("ARRIVED", NType.dotLarge, color = Color.White)
                     NText(s.place?.name.orEmpty(), NType.body, color = Color.White.copy(alpha = 0.7f), maxLines = 2)
-                } else if (route.isTrack) {
-                    // Following a GPX track: no turns to call out, so show what's left and whether you're on it.
-                    val d = formatDistance(if (nav.offTrack) nav.progress.offRoute else nav.progress.remaining)
-                    Readout(d.value, d.unit, valueStyle = NType.display, color = if (nav.offTrack) NothingRed else Color.White)
-                    NText(
-                        if (nav.offTrack) "Off the track. Head back to the line." else "left on ${route.via}",
-                        NType.body, color = Color.White.copy(alpha = 0.8f), maxLines = 2,
-                    )
                 } else {
                     val d = formatDistance(nav.progress.toManeuver)
                     Readout(d.value, d.unit, valueStyle = NType.display, color = Color.White)
@@ -123,7 +113,7 @@ fun NavBanner(s: UiState) {
                 }
             }
         }
-        if (!nav.arrived && then != null && !route.isTrack) {
+        if (!nav.arrived && then != null) {
             Spacer(Modifier.height(6.dp))
             Row(
                 Modifier

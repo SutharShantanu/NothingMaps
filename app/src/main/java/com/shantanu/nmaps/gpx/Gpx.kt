@@ -154,6 +154,13 @@ object Gpx {
     private fun String.xml() = replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;").replace("\"", "&quot;")
 }
 
+/** Writes GPX text into the cache folder that the FileProvider shares, named safely. */
+fun shareableGpx(context: android.content.Context, baseName: String, body: String): java.io.File {
+    val out = java.io.File(context.cacheDir, "gpx").apply { mkdirs() }
+    val safe = baseName.replace(Regex("[^A-Za-z0-9._-]+"), "_").take(80)
+    return java.io.File(out, "$safe.gpx").apply { writeText(body) }
+}
+
 /** Summary numbers for a track, and a downsampled elevation profile for drawing. */
 data class TrackStats(
     val distance: Double,

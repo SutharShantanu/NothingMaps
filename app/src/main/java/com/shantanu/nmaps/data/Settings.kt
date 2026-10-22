@@ -18,6 +18,8 @@ data class MapLayers(
     val transit: Boolean = false,
     val cycling: Boolean = false,
     val buildings3d: Boolean = false,
+    /** Geotagged pictures from the gallery, as thumbnails where they were taken. */
+    val photos: Boolean = false,
 )
 
 data class AppSettings(
@@ -25,6 +27,8 @@ data class AppSettings(
     val voice: Boolean = true,
     val autoNight: Boolean = true,
     val timeline: Boolean = false,
+    /** Steps and workouts from Health Connect shown in the timeline. */
+    val health: Boolean = false,
     /** Name shown to people you share your live location with. */
     val shareName: String = "",
     val layers: MapLayers = MapLayers(),
@@ -51,6 +55,7 @@ class SettingsStore(context: Context) {
         voice = prefs.getBoolean("voice", true),
         autoNight = prefs.getBoolean("autoNight", true),
         timeline = prefs.getBoolean("timeline", false),
+        health = prefs.getBoolean("health", false),
         shareName = prefs.getString("shareName", "").orEmpty(),
         avoidTolls = prefs.getBoolean("avoidTolls", false),
         avoidHighways = prefs.getBoolean("avoidHighways", false),
@@ -65,6 +70,7 @@ class SettingsStore(context: Context) {
             transit = prefs.getBoolean("transit", false),
             cycling = prefs.getBoolean("cycling", false),
             buildings3d = prefs.getBoolean("buildings3d", false),
+            photos = prefs.getBoolean("photos", false),
         ),
     ).also { UnitPrefs.imperial = it.imperial }
 
@@ -75,6 +81,7 @@ class SettingsStore(context: Context) {
             .putBoolean("voice", s.voice)
             .putBoolean("autoNight", s.autoNight)
             .putBoolean("timeline", s.timeline)
+            .putBoolean("health", s.health)
             .putString("shareName", s.shareName)
             .putBoolean("avoidTolls", s.avoidTolls)
             .putBoolean("avoidHighways", s.avoidHighways)
@@ -88,6 +95,7 @@ class SettingsStore(context: Context) {
             .putBoolean("transit", s.layers.transit)
             .putBoolean("cycling", s.layers.cycling)
             .putBoolean("buildings3d", s.layers.buildings3d)
+            .putBoolean("photos", s.layers.photos)
             .apply()
     }
 }

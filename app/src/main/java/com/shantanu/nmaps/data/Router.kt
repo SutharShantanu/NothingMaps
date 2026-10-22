@@ -92,16 +92,6 @@ object Router {
         }
         return Route(travel, points, r.getDouble("distance"), r.getDouble("duration"), steps, via, legEnds = legEnds, classes = classes)
     }
-
-    /** Treats a GPX track as a route to follow: no turn instructions, just the line and its end. */
-    fun fromTrack(points: List<LatLon>, name: String, travel: Travel, seconds: Double): Route {
-        val distance = com.shantanu.nmaps.nav.pathLength(points)
-        val steps = listOf(
-            Step("Follow $name", "depart", null, distance, points.first()),
-            Step("Arrive at the end of $name", "arrive", null, 0.0, points.last()),
-        )
-        return Route(travel, points, distance, seconds, steps, name, isTrack = true)
-    }
 }
 
 object Instructions {

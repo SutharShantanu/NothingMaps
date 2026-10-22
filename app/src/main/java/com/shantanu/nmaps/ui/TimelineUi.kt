@@ -75,6 +75,7 @@ fun TimelineSheet(vm: MapViewModel) {
         }
         Spacer(Modifier.height(10.dp))
         Suggestions(vm)
+        if (ui.month == null) HealthRow(vm)
 
         when {
             ui.month != null && !ui.loading -> MonthView(vm)
@@ -85,7 +86,11 @@ fun TimelineSheet(vm: MapViewModel) {
                 )
             }
             ui.loading -> SkeletonRows(3, Modifier.padding(vertical = 12.dp))
-            ui.segments.isEmpty() -> EmptyState(Glyphs.Clock, "Quiet day", "No places or trips were saved on this day.", compact = true)
+            ui.segments.isEmpty() -> EmptyState(
+                Glyphs.Clock, "Quiet day",
+                if (vm.timeline.isToday) "No places or trips saved yet today." else "No places or trips were saved on this day. History starts from when Timeline was switched on.",
+                compact = true,
+            )
             else -> LazyColumn(Modifier.heightIn(max = 300.dp)) {
                 itemsIndexed(ui.segments) { i, seg ->
                     Column(Modifier.animateItem()) {
@@ -149,6 +154,44 @@ fun TimelineSheet(vm: MapViewModel) {
                 }, Modifier.weight(1f))
             }
             NText("GPX export works with photo apps to geotag pictures by time.", NType.caption, Modifier.padding(top = 8.dp), color = p.muted)
+        }
+    }
+}
+
+/** Steps and workouts for the day from Health Connect, above the places and trips. */
+@Composable
+private fun HealthRow(vm: MapViewModel) {
+    val p = LocalPalette.current
+    val h = vm.timeline.ui.health
+    val time = DateFormat.getTimeInstance(DateFormat.SHORT)
+    val connect = rememberHealthConnect(vm)
+    when {
+        !vm.state.settings.health -> Row(
+            Modifier.fillMaxWidth().padding(bottom = 10.dp).background(p.surfaceRaised, androidx.compose.foundation.shape.RoundedCornerShape(18.dp)).padding(12.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            DotIcon(Glyphs.Steps, Modifier.size(18.dp))
+            Spacer(Modifier.width(12.dp))
+            NText("Show steps and workouts here from Health Connect.", NType.caption, Modifier.weight(1f))
+            Pill("Connect", connect, style = PillStyle.Filled, height = 34.dp)
+        }
+        h == null -> NText("Activity from Health Connect isn't available right now.", NType.caption, Modifier.padding(bottom = 8.dp), color = p.muted)
+        else -> Column(Modifier.fillMaxWidth().padding(bottom = 10.dp).background(p.surfaceRaised, androidx.compose.foundation.shape.RoundedCornerShape(18.dp)).padding(12.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                DotIcon(Glyphs.Steps, Modifier.size(22.dp))
+                Spacer(Modifier.width(12.dp))
+                Readout("%,d".format(h.steps), "steps", valueStyle = NType.dotMedium)
+                Spacer(Modifier.weight(1f))
+                NText("Health Connect", NType.caption, color = p.muted)
+            }
+            h.sessions.forEach { s ->
+                Row(Modifier.padding(top = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+                    DotIcon(Glyphs.Record, Modifier.size(16.dp), color = p.muted)
+                    Spacer(Modifier.width(12.dp))
+                    NText("${time.format(Date(s.start))} – ${time.format(Date(s.end))}", NType.caption, Modifier.width(110.dp), color = p.muted)
+                    NText("${s.label}, ${formatDuration((s.end - s.start) / 1000.0).joinToString(" ")}", NType.caption, Modifier.weight(1f))
+                }
+            }
         }
     }
 }

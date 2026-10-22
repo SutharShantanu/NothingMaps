@@ -54,6 +54,9 @@ sealed interface CameraCommand {
     data class QueryPois(val subclasses: List<String>, val result: CompletableDeferred<List<Place>>) : CameraCommand
 }
 
+/** A gallery photo drawn where it was taken; the style shows [thumb] as the icon "photo-<id>". */
+data class PhotoMarker(val id: Long, val at: LatLon, val thumb: android.graphics.Bitmap)
+
 /** One of the app's own markers. [id] comes back through onMarkerTap; [kind] picks its look in the style. */
 data class MapMarker(val id: String, val kind: String, val at: LatLon, val label: String? = null, val initial: String? = null)
 
@@ -61,10 +64,10 @@ data class MapMarker(val id: String, val kind: String, val at: LatLon, val label
 data class MapOverlays(
     /** Other route options with their index in the route list, so a tap can pick one. */
     val alternatives: List<Pair<Int, List<LatLon>>> = emptyList(),
-    val trackLines: List<List<LatLon>> = emptyList(),
     /** Red dotted lines: the timeline's path, or the walking parts of a transit trip — one line each. */
     val history: List<List<LatLon>> = emptyList(),
     val markers: List<MapMarker> = emptyList(),
+    val photos: List<PhotoMarker> = emptyList(),
 )
 
 /**
@@ -203,15 +206,20 @@ fun DotMap(
     LaunchedEffect(style, overlays) {
         val st = style ?: return@LaunchedEffect
         st.push(MapStyle.SRC_ALT, collection(overlays.alternatives.map { (i, pts) -> lineFeature(pts, JSONObject().put("index", i)) }))
-        st.push(MapStyle.SRC_LINES, collection(
-            overlays.trackLines.map { lineFeature(it, JSONObject().put("kind", "track")) } +
-                overlays.history.map { lineFeature(it, JSONObject().put("kind", "history")) }
-        ))
+        st.push(MapStyle.SRC_LINES, collection(overlays.history.map { lineFeature(it, JSONObject().put("kind", "history")) }))
         st.push(MapStyle.SRC_POINTS, collection(overlays.markers.map { mk ->
             val props = JSONObject().put("id", mk.id).put("kind", mk.kind)
             mk.label?.let { props.put("label", it) }
             mk.initial?.let { props.put("initial", it) }
             JSONObject(point(mk.at.lat, mk.at.lon, props))
+        }))
+        try {
+            // Thumbnails become style images once each; the features just name them.
+            overlays.photos.forEach { ph -> if (st.getImage("photo-${ph.id}") == null) st.addImage("photo-${ph.id}", ph.thumb) }
+        } catch (_: IllegalStateException) {
+        }
+        st.push(MapStyle.SRC_PHOTOS, collection(overlays.photos.map { ph ->
+            JSONObject(point(ph.at.lat, ph.at.lon, JSONObject().put("id", "photo:${ph.id}").put("icon", "photo-${ph.id}")))
         }))
     }
 

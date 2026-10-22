@@ -12,6 +12,8 @@ import com.shantanu.nmaps.gpx.Gpx
 import com.shantanu.nmaps.gpx.GpxPoint
 import com.shantanu.nmaps.gpx.GpxTrack
 import com.shantanu.nmaps.gpx.shareableGpx
+import com.shantanu.nmaps.health.HealthConnect
+import com.shantanu.nmaps.health.HealthDay
 import com.shantanu.nmaps.nav.distanceMeters
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -37,6 +39,8 @@ data class TimelineUi(
     /** Likely home and work from history, offered when those shortcuts aren't set. */
     val suggestedHome: LatLon? = null,
     val suggestedWork: LatLon? = null,
+    /** Steps and workouts from Health Connect for the day, when that's switched on. */
+    val health: HealthDay? = null,
 )
 
 class TimelineController(
@@ -45,6 +49,7 @@ class TimelineController(
     private val savedPlaces: () -> List<Place>,
     /** Whether Home and Work are already set, so they aren't suggested again. */
     private val shortcutsSet: () -> Pair<Boolean, Boolean> = { false to false },
+    private val healthEnabled: () -> Boolean = { false },
 ) {
     private val db = HistoryDb.get(context)
     private var loadJob: Job? = null
@@ -60,8 +65,13 @@ class TimelineController(
 
     fun load(dayStart: Long = ui.dayStart) {
         loadJob?.cancel()
-        ui = ui.copy(dayStart = dayStart, segments = emptyList(), path = emptyList(), names = emptyMap(), loading = true, month = null)
+        ui = ui.copy(dayStart = dayStart, segments = emptyList(), path = emptyList(), names = emptyMap(), loading = true, month = null, health = null)
         loadJob = scope.launch {
+            if (healthEnabled()) launch {
+                // Read `ui` only after the call returns, or this would overwrite the day load with a stale copy.
+                val health = HealthConnect.day(context, dayStart, nextDay(dayStart))
+                if (ui.dayStart == dayStart) ui = ui.copy(health = health)
+            }
             val points = withContext(Dispatchers.IO) { db.range(dayStart, nextDay(dayStart)) }
             val modes = withContext(Dispatchers.IO) { db.tripModes(dayStart, nextDay(dayStart)) }
             // The user's own corrections override the guessed travel mode.
