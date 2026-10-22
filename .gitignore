@@ -1,0 +1,31 @@
+*.iml
+.gradle
+.kotlin
+/local.properties
+/.idea/caches
+/.idea/libraries
+/.idea/modules.xml
+/.idea/workspace.xml
+/.idea/navEditor.xml
+/.idea/assetWizardSettings.xml
+.DS_Store
+/build
+**/build/
+/captures
+.externalNativeBuild
+.cxx
+local.properties
+.env
+debug.keystore
+
+# Firebase config — supply your own; never commit
+app/google-services.json
+google-services.json
+
+# Agent configs and design prototypes
+.agents
+.stitch_inventory/
+artifacts/
+skills-lock.json
+.idea/
+gradle/gradle-daemon-jvm.properties
