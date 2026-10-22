@@ -25,7 +25,11 @@ jobs:
           distribution: temurin
           java-version: 21
 
-      - uses: android-actions/setup-android@v3
+      # The runner ships an SDK; add the platform this app compiles against (setup-android trips over preview licences).
+      - name: Android platform 37
+        run: |
+          yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --licenses >/dev/null || true
+          "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --install "platforms;android-37.0" "build-tools;36.0.0" >/dev/null
 
       - uses: gradle/actions/setup-gradle@v4
 
