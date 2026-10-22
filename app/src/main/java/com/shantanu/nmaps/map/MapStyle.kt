@@ -26,13 +26,14 @@ object MapStyle {
     const val SRC_ALT = "alt"
     const val SRC_LINES = "lines"
     const val SRC_POINTS = "points"
+    const val SRC_PHOTOS = "photos"
 
     /** Heading beam images by compass accuracy, narrowest first. */
     const val BEAM_NARROW = "beam-narrow"
     const val BEAM_MEDIUM = "beam-medium"
     const val BEAM_WIDE = "beam-wide"
     val TAPPABLE_LAYERS = arrayOf("poi-label", "poi-dot", "place-minor", "place-city", "transit-label", "transit-stops")
-    val MARKER_LAYERS = arrayOf("pt-ring", "pt-small", "pt-initial", "pt-label")
+    val MARKER_LAYERS = arrayOf("pt-ring", "pt-small", "pt-initial", "pt-label", "pt-photo")
     val ME_LAYERS = arrayOf("me-dot", "me-halo")
     val ALT_LAYERS = arrayOf("alt-route")
 
@@ -269,9 +270,7 @@ object MapStyle {
             // Alternative routes sit under the chosen one, in grey; tap to switch.
             geoLine("alt-casing", SRC_ALT, null, mapOf("line-color" to c.casing, "line-width" to zoom(10, 6, 14, 9, 18, 15))),
             geoLine("alt-route", SRC_ALT, null, mapOf("line-color" to c.label, "line-width" to zoom(10, 3, 14, 5, 18, 9))),
-            // Imported GPX tracks and the timeline's path for a day.
-            geoLine("lines-casing", SRC_LINES, kindIs("track"), mapOf("line-color" to c.casing, "line-width" to zoom(10, 5, 16, 8))),
-            geoLine("lines-track", SRC_LINES, kindIs("track"), mapOf("line-color" to c.labelStrong, "line-width" to zoom(10, 2.5, 16, 4.5))),
+            // The timeline's path for a day, and the walking parts of a transit trip.
             geoLine("lines-history", SRC_LINES, kindIs("history"), mapOf("line-color" to RED, "line-width" to zoom(10, 3, 16, 5), "line-dasharray" to listOf(0, 1.8))),
             geoLine("track", SRC_TRACK, null, mapOf("line-color" to c.labelStrong, "line-width" to zoom(10, 2.5, 16, 4.5, 20, 8), "line-opacity" to 0.9)),
             geoLine("route-casing", SRC_ROUTE, listOf("!", listOf("get", "dotted")), mapOf("line-color" to c.casing, "line-width" to zoom(10, 6, 14, 9, 18, 15))),
@@ -298,7 +297,11 @@ object MapStyle {
         )
 
         val markers = listOf(
-            // Points: friends, parking, track ends, nearby results, timeline visits.
+            // Gallery photos as round thumbnails; they yield to each other rather than pile up.
+            mapOf("id" to "pt-photo", "type" to "symbol", "source" to SRC_PHOTOS,
+                "layout" to mapOf("icon-image" to listOf("get", "icon"), "icon-size" to 0.5, "icon-allow-overlap" to false, "icon-ignore-placement" to false,
+                    "icon-padding" to 2)),
+            // Points: friends, parking, nearby results, timeline visits.
             circle("pt-ring", SRC_POINTS, listOf("match", listOf("get", "kind"), listOf("friend", "parking"), true, false),
                 mapOf("circle-radius" to 14, "circle-color" to c.labelStrong, "circle-stroke-width" to 2.5, "circle-stroke-color" to RED)),
             circle("pt-small", SRC_POINTS, listOf("match", listOf("get", "kind"), listOf("nearby", "visit", "start", "end", "stop"), true, false),
@@ -353,7 +356,7 @@ object MapStyle {
             if (layers.terrain) put("dem", mapOf("type" to "raster-dem", "encoding" to "terrarium", "tileSize" to 256, "maxzoom" to 15,
                 "tiles" to listOf("https://s3.amazonaws.com/elevation-tiles-prod/terrarium/{z}/{x}/{y}.png"),
                 "attribution" to "Terrain: Mapzen, AWS Open Data"))
-            listOf(SRC_ROUTE, SRC_DEST, SRC_ME, SRC_TRACK, SRC_ALT, SRC_LINES, SRC_POINTS).forEach { put(it, emptyGeo) }
+            listOf(SRC_ROUTE, SRC_DEST, SRC_ME, SRC_TRACK, SRC_ALT, SRC_LINES, SRC_POINTS, SRC_PHOTOS).forEach { put(it, emptyGeo) }
         }
 
         val style = mapOf(

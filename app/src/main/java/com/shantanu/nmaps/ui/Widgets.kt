@@ -6,6 +6,8 @@ import android.content.Intent
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -44,6 +46,46 @@ fun Toggle(on: Boolean, modifier: Modifier = Modifier) {
         val r = size.height / 2
         drawRoundRect(if (on) p.red else p.faint, cornerRadius = androidx.compose.ui.geometry.CornerRadius(r, r))
         drawCircle(androidx.compose.ui.graphics.Color.White, r - 4.dp.toPx(), Offset(r + x * (size.width - 2 * r), r))
+    }
+}
+
+/** Weather and air quality for the spot on screen: sky glyph, temperature, and the AQI with a coloured dot. */
+@Composable
+fun WeatherBadge(c: com.shantanu.nmaps.data.Conditions, modifier: Modifier = Modifier) {
+    val p = LocalPalette.current
+    val glyph = when (c.sky) {
+        com.shantanu.nmaps.data.Sky.Sun -> Glyphs.Sun
+        com.shantanu.nmaps.data.Sky.Moon -> Glyphs.Moon
+        com.shantanu.nmaps.data.Sky.Cloud -> Glyphs.Cloud
+        com.shantanu.nmaps.data.Sky.Rain -> Glyphs.Rain
+        com.shantanu.nmaps.data.Sky.Snow -> Glyphs.Snow
+        com.shantanu.nmaps.data.Sky.Storm -> Glyphs.Storm
+    }
+    val aqi = c.aqi
+    Row(
+        modifier
+            .height(36.dp)
+            .background(p.surface, CircleShape)
+            .border(1.dp, p.line, CircleShape)
+            .padding(horizontal = 12.dp)
+            .semantics { contentDescription = "${c.temperature}, ${c.sky.name.lowercase()}" + (aqi?.let { ", air quality $it, ${com.shantanu.nmaps.data.Weather.aqiLabel(it)}" } ?: "") },
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        DotIcon(glyph, Modifier.size(16.dp))
+        Spacer(Modifier.width(8.dp))
+        NText(c.temperature, NType.dotLabel)
+        if (aqi != null) {
+            Spacer(Modifier.width(10.dp))
+            val tone = when {
+                aqi <= 50 -> androidx.compose.ui.graphics.Color(0xFF3DBE6C)
+                aqi <= 100 -> androidx.compose.ui.graphics.Color(0xFFE2B93B)
+                aqi <= 150 -> androidx.compose.ui.graphics.Color(0xFFF0883A)
+                else -> p.red
+            }
+            Canvas(Modifier.size(8.dp)) { drawCircle(tone) }
+            Spacer(Modifier.width(6.dp))
+            NText("AQI $aqi", NType.caption, color = p.muted)
+        }
     }
 }
 

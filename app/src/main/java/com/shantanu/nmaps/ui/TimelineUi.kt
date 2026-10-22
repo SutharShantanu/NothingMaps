@@ -75,6 +75,7 @@ fun TimelineSheet(vm: MapViewModel) {
         }
         Spacer(Modifier.height(10.dp))
         Suggestions(vm)
+        if (ui.month == null) HealthRow(vm)
 
         when {
             ui.month != null && !ui.loading -> MonthView(vm)
@@ -149,6 +150,32 @@ fun TimelineSheet(vm: MapViewModel) {
                 }, Modifier.weight(1f))
             }
             NText("GPX export works with photo apps to geotag pictures by time.", NType.caption, Modifier.padding(top = 8.dp), color = p.muted)
+        }
+    }
+}
+
+/** Steps and workouts for the day from Health Connect, above the places and trips. */
+@Composable
+private fun HealthRow(vm: MapViewModel) {
+    val p = LocalPalette.current
+    val h = vm.timeline.ui.health
+    val time = DateFormat.getTimeInstance(DateFormat.SHORT)
+    if (!vm.state.settings.timeline && h == null) return
+    when {
+        !vm.state.settings.health -> return
+        h == null -> NText("Activity from Health Connect isn't available right now.", NType.caption, Modifier.padding(bottom = 8.dp), color = p.muted)
+        else -> Column(Modifier.fillMaxWidth().padding(bottom = 10.dp).background(p.surfaceRaised, androidx.compose.foundation.shape.RoundedCornerShape(18.dp)).padding(12.dp)) {
+            Row(verticalAlignment = Alignment.Bottom) {
+                Readout("%,d".format(h.steps), "steps", valueStyle = NType.dotMedium)
+                Spacer(Modifier.weight(1f))
+                NText("Health Connect", NType.caption, color = p.muted)
+            }
+            h.sessions.forEach { s ->
+                Row(Modifier.padding(top = 6.dp)) {
+                    NText("${time.format(Date(s.start))} – ${time.format(Date(s.end))}", NType.caption, Modifier.width(118.dp), color = p.muted)
+                    NText("${s.label}, ${formatDuration((s.end - s.start) / 1000.0).joinToString(" ")}", NType.caption, Modifier.weight(1f))
+                }
+            }
         }
     }
 }

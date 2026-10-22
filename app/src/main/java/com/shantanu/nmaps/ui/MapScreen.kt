@@ -81,7 +81,7 @@ import com.shantanu.nmaps.ui.theme.NType
 import kotlin.math.abs
 
 /** Screens drawn over the whole map rather than as a sheet on it. */
-private val fullScreens = setOf(Screen.Search, Screen.Saved, Screen.Menu, Screen.Offline, Screen.Tracks, Screen.Settings)
+private val fullScreens = setOf(Screen.Search, Screen.Saved, Screen.Menu, Screen.Offline, Screen.Settings)
 
 @Composable
 fun MapScreen(vm: MapViewModel) {
@@ -151,7 +151,7 @@ fun MapScreen(vm: MapViewModel) {
             onUserPan = vm::onUserPan,
             onTap = vm::onMapTap,
             onLongPress = vm::onLongPress,
-            onMarkerTap = vm::onMarkerTap,
+            onMarkerTap = { id -> if (id.startsWith("photo:")) openPhoto(context, id.removePrefix("photo:").toLong()) else vm.onMarkerTap(id) },
             onMeTap = vm::onMeTap,
             onAlternativeTap = vm::chooseRoute,
             onCameraIdle = vm::onCameraIdle,
@@ -162,7 +162,7 @@ fun MapScreen(vm: MapViewModel) {
         )
 
         if (s.screen == Screen.OfflineSelect) OfflineFrame()
-        if (s.settings.coordinates && s.screen in setOf(Screen.Map, Screen.Report)) Crosshair()
+        if (s.screen == Screen.PickOnMap || (s.settings.coordinates && s.screen in setOf(Screen.Map, Screen.Report))) Crosshair()
 
         Column(
             Modifier
@@ -180,6 +180,9 @@ fun MapScreen(vm: MapViewModel) {
                     TopSlot.Search -> Column {
                         SearchBar(vm)
                         AnimatedVisibility(s.screen == Screen.Map, enter = fadeIn(), exit = fadeOut()) { QuickChips(vm) }
+                        AnimatedVisibility(s.screen == Screen.Map && vm.mapWeather != null, enter = fadeIn(), exit = fadeOut()) {
+                            rememberLast(vm.mapWeather)?.let { WeatherBadge(it, Modifier.padding(top = 10.dp)) }
+                        }
                     }
                     TopSlot.Route -> RouteHeader(vm)
                     TopSlot.Nav -> NavBanner(s)
@@ -204,7 +207,7 @@ fun MapScreen(vm: MapViewModel) {
 
             Spacer(Modifier.weight(1f))
 
-            if (s.screen !in setOf(Screen.Timeline, Screen.OfflineSelect, Screen.Share, Screen.Friend, Screen.Track)) {
+            if (s.screen !in setOf(Screen.Timeline, Screen.OfflineSelect, Screen.Share, Screen.Friend)) {
                 MapControls(vm = vm, showSpeed = s.screen == Screen.Nav, attribution = s.screen == Screen.Map)
                 Spacer(Modifier.height(12.dp))
             }
@@ -224,10 +227,10 @@ fun MapScreen(vm: MapViewModel) {
                     Screen.Route -> RouteSheet(vm)
                     Screen.Nav -> NavFooter(vm)
                     Screen.Record -> RecordSheet(vm, rec)
+                    Screen.PickOnMap -> PickOnMapSheet(vm)
                     Screen.Layers -> LayersSheet(vm)
                     Screen.OfflineSelect -> OfflineSelectSheet(vm)
                     Screen.Timeline -> TimelineSheet(vm)
-                    Screen.Track -> TrackSheet(vm)
                     Screen.Share -> ShareSheet(vm)
                     Screen.Friend -> FriendSheet(vm)
                     Screen.Me -> MeSheet(vm)
@@ -247,7 +250,6 @@ fun MapScreen(vm: MapViewModel) {
                 Screen.Saved -> SavedScreen(vm)
                 Screen.Menu -> MenuScreen(vm)
                 Screen.Offline -> OfflineScreen(vm)
-                Screen.Tracks -> TracksScreen(vm)
                 Screen.Settings -> SettingsScreen(vm)
                 else -> Box(Modifier)
             }
@@ -283,6 +285,21 @@ private fun Splash() {
     }
 }
 
+/** Confirms the spot under the crosshair; the name fills in from a reverse lookup as the map settles. */
+@Composable
+private fun PickOnMapSheet(vm: MapViewModel) {
+    val p = LocalPalette.current
+    val pick = vm.state.mapPick
+    Column(Modifier.sheet().padding(horizontal = 20.dp).padding(bottom = 16.dp)) {
+        SheetTitle("Move the map to the spot", { vm.back() })
+        Spacer(Modifier.height(10.dp))
+        NText(pick?.name ?: "Waiting for the map", NType.bodyStrong, maxLines = 1)
+        NText(pick?.address.orEmpty().ifBlank { " " }, NType.caption, color = p.muted, maxLines = 1)
+        Spacer(Modifier.height(16.dp))
+        Pill("Use this location", vm::confirmMapPick, Modifier.fillMaxWidth(), style = if (pick != null) PillStyle.Filled else PillStyle.Outlined, glyph = Glyphs.Pin)
+    }
+}
+
 /** Markers and lines for whatever the current screen is about. */
 private fun overlays(vm: MapViewModel, s: UiState): MapOverlays {
     val markers = buildList {
@@ -303,18 +320,10 @@ private fun overlays(vm: MapViewModel, s: UiState): MapOverlays {
                 if (seg is Visit) add(MapMarker("visit:$i", "visit", seg.center, ui.names[i]))
             }
         }
-        if (s.screen == Screen.Track) {
-            vm.tracks.selectedPoints.firstOrNull()?.let { add(MapMarker("start", "start", it.latLon, "Start")) }
-            vm.tracks.selectedPoints.lastOrNull()?.let { add(MapMarker("end", "end", it.latLon, "Finish")) }
-        }
     }
     val alternatives = if (s.screen == Screen.Route) {
         s.routes.mapIndexedNotNull { i, r -> if (r == s.route) null else i to r.points }
     } else emptyList()
-    val trackLines = buildList {
-        addAll(vm.tracks.visibleLines)
-        if (s.screen == Screen.Track) add(vm.tracks.selectedPoints.map { it.latLon })
-    }
     val history = when {
         s.screen == Screen.Timeline -> listOf(vm.timeline.ui.path)
         // Walking parts of a transit trip are dotted, rides solid, like the other apps.
@@ -322,7 +331,15 @@ private fun overlays(vm: MapViewModel, s: UiState): MapOverlays {
             s.transit.getOrNull(s.transitIndex)?.legs?.filter { it.mode == com.shantanu.nmaps.transit.TransitMode.Walk }?.map { it.points }.orEmpty()
         else -> emptyList()
     }
-    return MapOverlays(alternatives, trackLines, history, markers)
+    return MapOverlays(alternatives, history, markers, if (s.screen in setOf(Screen.Map, Screen.Place, Screen.Timeline)) vm.photoMarkers else emptyList())
+}
+
+/** Opens a gallery photo in whatever app shows pictures, the gallery included. */
+private fun openPhoto(context: android.content.Context, id: Long) {
+    val uri = android.content.ContentUris.withAppendedId(android.provider.MediaStore.Images.Media.EXTERNAL_CONTENT_URI, id)
+    runCatching {
+        context.startActivity(android.content.Intent(android.content.Intent.ACTION_VIEW).setDataAndType(uri, "image/*").addFlags(android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION))
+    }
 }
 
 private enum class TopSlot { Search, Route, Nav, Record, None }

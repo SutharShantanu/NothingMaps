@@ -21,7 +21,7 @@ class RouteAnnotator(private val source: TileSource) {
     private class Hit(val cls: String, val toll: Boolean, val brunnel: String?)
 
     fun annotate(route: Route): Route {
-        if (route.points.size < 2 || route.isTrack) return route
+        if (route.points.size < 2) return route
         val samples = Terrain.resample(route.points, SPACING, 1500)
         val segs = HashMap<TileId, List<Seg>>()
         val hits = samples.map { p -> nearest(p, segs) }

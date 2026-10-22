@@ -45,23 +45,16 @@ class MainActivity : ComponentActivity() {
         handle(intent)
     }
 
-    /** Things other apps hand us: geo: locations, live-location links, GPX files and shared text. */
+    /** Things other apps hand us: geo: locations, live-location links and shared text. */
     private fun handle(intent: Intent?) {
         intent ?: return
         val data = intent.data
         when {
             data?.scheme == "nmaps" -> vm.addFriend(data.toString())
             data?.scheme == "geo" -> openGeo(data)
-            intent.action == Intent.ACTION_VIEW && data != null -> vm.importGpx(data)
             intent.action == Intent.ACTION_SEND -> {
-                val stream = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-                    intent.getParcelableExtra(Intent.EXTRA_STREAM, Uri::class.java)
-                } else {
-                    @Suppress("DEPRECATION") intent.getParcelableExtra(Intent.EXTRA_STREAM)
-                }
                 val text = intent.getStringExtra(Intent.EXTRA_TEXT).orEmpty()
                 when {
-                    stream != null -> vm.importGpx(stream)
                     ShareLink.find(text) != null -> vm.addFriend(text)
                     text.isNotBlank() -> vm.searchFor(text.lineSequence().first().take(120))
                 }

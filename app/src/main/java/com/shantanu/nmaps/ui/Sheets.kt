@@ -69,8 +69,10 @@ fun PlaceSheet(vm: MapViewModel) {
     val p = LocalPalette.current
     val context = LocalContext.current
     val place = rememberLast(s.place) ?: return
-    val saved = s.saved.any { it.key == place.key }
+    val savedAs = s.saved.firstOrNull { it.key == place.key }
+    val saved = savedAs != null
     val isParking = s.parking?.key == place.key
+    var naming by remember(place.key) { mutableStateOf(false) }
 
     Column(Modifier.sheet().padding(horizontal = 20.dp).padding(bottom = 20.dp)) {
         SheetHandle()
@@ -86,21 +88,41 @@ fun PlaceSheet(vm: MapViewModel) {
             RoundButton(Glyphs.Close, "Close", { vm.back() }, Modifier.size(40.dp))
         }
 
-        s.fix?.let { fix ->
-            Spacer(Modifier.height(16.dp))
-            val d = formatDistance(distanceMeters(fix.point, place.point))
-            Row(verticalAlignment = Alignment.Bottom) {
+        if (s.fix != null || s.weather != null) Spacer(Modifier.height(16.dp))
+        Row(verticalAlignment = Alignment.Bottom) {
+            s.fix?.let { fix ->
+                val d = formatDistance(distanceMeters(fix.point, place.point))
                 Readout(d.value, d.unit, valueStyle = NType.dotMedium)
                 NText("away", NType.caption, color = p.muted, modifier = Modifier.padding(start = 6.dp, bottom = 3.dp))
             }
+            Spacer(Modifier.weight(1f))
+            s.weather?.let { WeatherBadge(it) }
         }
 
         Spacer(Modifier.height(20.dp))
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             Pill("Directions", vm::directions, Modifier.weight(1f), style = PillStyle.Filled)
             if (isParking) Pill("Clear", vm::clearParking, glyph = Glyphs.Parking)
-            else Pill(if (saved) "Saved" else "Save", { vm.toggleSaved(place) }, glyph = if (saved) Glyphs.StarOn else Glyphs.Star)
+            else Pill(
+                if (saved) "Saved" else "Save",
+                { if (saved) vm.unsave(place) else naming = true },
+                glyph = if (saved) Glyphs.StarOn else Glyphs.Star,
+                onLongClick = if (saved) ({ naming = true }) else null,
+            )
             Pill("Share", { share(context, place) }, glyph = Glyphs.Share)
+        }
+        AnimatedVisibility(naming, enter = expandVertically(), exit = shrinkVertically()) {
+            NameEditor(
+                savedAs?.name ?: place.name, "Name this place",
+                onSave = { vm.savePlace(place, it); naming = false },
+                onCancel = { naming = false },
+                Modifier.padding(top = 12.dp),
+            )
+        }
+        if (savedAs != null && savedAs.name != place.name) {
+            NText("Saved as “${savedAs.name}”. Hold Saved to rename.", NType.caption, Modifier.padding(top = 8.dp), color = p.muted)
+        } else if (saved) {
+            NText("Hold Saved to rename.", NType.caption, Modifier.padding(top = 8.dp), color = p.muted)
         }
         Spacer(Modifier.height(12.dp))
         Row(verticalAlignment = Alignment.CenterVertically) {
@@ -291,7 +313,6 @@ fun RouteSheet(vm: MapViewModel) {
                 )
             } else {
                 Pill(if (showSteps) "Hide" else "Steps", { showSteps = !showSteps })
-                Pill("GPX", { vm.exportRoute()?.let { shareFile(context, it, title = "Export route") } }, glyph = Glyphs.Share)
                 Pill(
                     "Start",
                     { if (route != null && s.fix != null) vm.startNav() },

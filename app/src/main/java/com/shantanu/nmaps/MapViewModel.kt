@@ -2,7 +2,6 @@ package com.shantanu.nmaps
 
 import android.app.Application
 import android.hardware.GeomagneticField
-import android.net.Uri
 import android.speech.tts.TextToSpeech
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
@@ -12,6 +11,8 @@ import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.shantanu.nmaps.data.AppSettings
 import com.shantanu.nmaps.data.Category
+import com.shantanu.nmaps.data.Conditions
+import com.shantanu.nmaps.data.Weather
 import com.shantanu.nmaps.data.Fix
 import com.shantanu.nmaps.data.Geocoder
 import com.shantanu.nmaps.data.LatLon
@@ -36,10 +37,7 @@ import com.shantanu.nmaps.data.onlineFlow
 import com.shantanu.nmaps.data.parseCoordinates
 import com.shantanu.nmaps.gpx.Gpx
 import com.shantanu.nmaps.gpx.GpxPoint
-import com.shantanu.nmaps.gpx.GpxTrack
 import com.shantanu.nmaps.gpx.GpxWaypoint
-import com.shantanu.nmaps.gpx.SavedTrack
-import com.shantanu.nmaps.gpx.TrackController
 import com.shantanu.nmaps.gpx.shareableGpx
 import com.shantanu.nmaps.map.CameraCommand
 import com.shantanu.nmaps.map.Follow
@@ -49,6 +47,8 @@ import com.shantanu.nmaps.nav.formatDistance
 import com.shantanu.nmaps.nav.spokenDistance
 import com.shantanu.nmaps.offline.Bounds
 import com.shantanu.nmaps.offline.OfflineMaps
+import com.shantanu.nmaps.photos.PhotoStore
+import com.shantanu.nmaps.map.PhotoMarker
 import com.shantanu.nmaps.offline.engine.LiveTileSource
 import com.shantanu.nmaps.offline.engine.OfflineDbTileSource
 import com.shantanu.nmaps.offline.engine.OfflineRouteException
@@ -84,8 +84,8 @@ import java.io.File
 import java.util.Locale
 
 enum class Screen {
-    Map, Search, Place, Route, Nav, Saved, Record,
-    Menu, Layers, Offline, OfflineSelect, Timeline, Tracks, Track, Share, Friend, Settings, Me, Report,
+    Map, Search, Place, Route, Nav, Saved, Record, PickOnMap,
+    Menu, Layers, Offline, OfflineSelect, Timeline, Share, Friend, Settings, Me, Report,
 }
 
 /** What search is choosing a place for: a Home/Work shortcut, or a slot in the trip being planned. */
@@ -111,8 +111,6 @@ data class NavState(
     val progress: RouteTracker.Progress,
     val arrived: Boolean = false,
     val rerouting: Boolean = false,
-    /** Following a GPX track and currently away from it. */
-    val offTrack: Boolean = false,
 )
 
 data class UiState(
@@ -132,11 +130,15 @@ data class UiState(
     val category: Category? = null,
 
     val place: Place? = null,
+    /** Weather and air quality at [place], once looked up. */
+    val weather: Conditions? = null,
     val parking: Place? = null,
     val home: Place? = null,
     val work: Place? = null,
     /** Set while search is picking a place for something other than just viewing it. */
     val pick: Pick? = null,
+    /** On the pick-on-map screen: the place under the crosshair, named by a reverse lookup. */
+    val mapPick: Place? = null,
     val plan: Plan = Plan(),
 
     val travel: Travel = Travel.Drive,
@@ -194,11 +196,17 @@ class MapViewModel(app: Application) : AndroidViewModel(app) {
     private var avoidJob: Job? = null
     /** Start, stops and destination of the current directions. */
     private var waypoints: List<LatLon> = emptyList()
-    val tracks = TrackController(app)
     val share = ShareController(app, viewModelScope)
-    val timeline = TimelineController(app, viewModelScope, { state.saved + listOfNotNull(state.home, state.work) }) {
-        (state.home != null) to (state.work != null)
-    }
+    val timeline = TimelineController(
+        app, viewModelScope, { state.saved + listOfNotNull(state.home, state.work) },
+        { (state.home != null) to (state.work != null) }, { state.settings.health },
+    )
+    val photos = PhotoStore(app)
+
+    /** Thumbnails for the photos in view, rebuilt when the camera settles. */
+    var photoMarkers by mutableStateOf<List<PhotoMarker>>(emptyList())
+        private set
+    private var photoJob: Job? = null
 
     var state by mutableStateOf(
         UiState(
@@ -231,6 +239,12 @@ class MapViewModel(app: Application) : AndroidViewModel(app) {
     var cameraZoom by mutableFloatStateOf(15f)
         private set
 
+    /** Weather where the map is looking, refreshed when the camera settles. */
+    var mapWeather by mutableStateOf<Conditions?>(null)
+        private set
+    private var mapWeatherJob: Job? = null
+    private var weatherJob: Job? = null
+
     private var speedLimits: SpeedLimitMap? = null
     private var lastReadyAreas: Set<Long> = emptySet()
     private var elevationJob: Job? = null
@@ -255,7 +269,6 @@ class MapViewModel(app: Application) : AndroidViewModel(app) {
     private val announced = mutableSetOf<String>()
     private var offRouteCount = 0
     private var lastReroute = 0L
-    private var lastOffTrackWarning = 0L
     private var lastLimitCheck = 0L
 
     private var ttsReady = false
@@ -267,9 +280,9 @@ class MapViewModel(app: Application) : AndroidViewModel(app) {
     init {
         Tracking.timelineEnabled = state.settings.timeline
         viewModelScope.launch { onlineFlow(app).collect { state = state.copy(online = it) } }
-        viewModelScope.launch { tracks.refreshLines() }
         viewModelScope.launch { Tracking.endNavRequests.collect { if (tracker != null) endNav() } }
         offline.refresh()
+        if (state.settings.layers.photos) viewModelScope.launch { photos.scan() }
         // New or deleted areas change what the on-phone engine can see.
         viewModelScope.launch {
             offline.areas.collect { list ->
@@ -296,7 +309,7 @@ class MapViewModel(app: Application) : AndroidViewModel(app) {
 
     private fun go(screen: Screen) {
         // Screens that frame something on the map take the camera away from following you.
-        val frames = screen in setOf(Screen.Timeline, Screen.Track, Screen.Friend, Screen.OfflineSelect)
+        val frames = screen in setOf(Screen.Timeline, Screen.Friend, Screen.OfflineSelect)
         state = state.copy(screen = screen, follow = if (frames) Follow.None else state.follow)
     }
 
@@ -408,6 +421,82 @@ class MapViewModel(app: Application) : AndroidViewModel(app) {
 
     fun onCameraIdle(bounds: Bounds) {
         visible = bounds
+        if (state.screen == Screen.PickOnMap) resolveMapPick(bounds.center)
+        loadMapWeather(bounds.center)
+        loadPhotoMarkers(bounds)
+    }
+
+    /** Photos in view, as round thumbnails; off until zoomed in enough for them to be distinct. */
+    private fun loadPhotoMarkers(bounds: Bounds) {
+        photoJob?.cancel()
+        if (!state.settings.layers.photos || cameraZoom < 11f) {
+            if (photoMarkers.isNotEmpty()) photoMarkers = emptyList()
+            return
+        }
+        val px = (56 * getApplication<Application>().resources.displayMetrics.density).toInt()
+        photoJob = viewModelScope.launch {
+            photoMarkers = photos.inBounds(bounds).mapNotNull { p -> photos.thumbnail(p, px)?.let { PhotoMarker(p.id, p.point, it) } }
+        }
+    }
+
+    /** Photos layer switched on from the layer sheet, once the gallery permission is granted. */
+    fun enablePhotos() {
+        setLayers(state.settings.layers.copy(photos = true))
+        viewModelScope.launch {
+            photos.scan()
+            visible?.let { loadPhotoMarkers(it) }
+            if (photos.photos.isEmpty()) toast("No photos with a location in the gallery")
+        }
+    }
+
+    /** One lookup per settled view, a moment after the camera stops, and only when zoomed in enough to be somewhere. */
+    private fun loadMapWeather(center: LatLon) {
+        mapWeatherJob?.cancel()
+        if (!state.online || cameraZoom < 7f) {
+            mapWeather = null
+            return
+        }
+        mapWeatherJob = viewModelScope.launch {
+            delay(1200)
+            mapWeather = runCatching { Weather.at(center) }.getOrNull()
+        }
+    }
+
+    private fun loadWeather(at: LatLon) {
+        weatherJob?.cancel()
+        state = state.copy(weather = null)
+        if (!state.online) return
+        weatherJob = viewModelScope.launch {
+            val c = runCatching { Weather.at(at) }.getOrNull() ?: return@launch
+            if (state.place?.point == at) state = state.copy(weather = c)
+        }
+    }
+
+    // ---- pick on map ---------------------------------------------------------------------
+
+    /** "Choose on map" from the picker: the crosshair picks the spot, the sheet confirms it. */
+    fun pickOnMap() {
+        state = state.copy(screen = Screen.PickOnMap, follow = Follow.None, mapPick = null)
+    }
+
+    private fun resolveMapPick(at: LatLon) {
+        val coords = "%.5f, %.5f".format(Locale.US, at.lat, at.lon)
+        state = state.copy(mapPick = Place(coords, "Finding the address…", at.lat, at.lon))
+        placeJob?.cancel()
+        placeJob = viewModelScope.launch {
+            delay(500)
+            val found = runCatching { Geocoder.reverse(at) }.getOrNull()
+            if (state.screen != Screen.PickOnMap || state.mapPick?.point != at) return@launch
+            // No lookup (offline): the pin still works, named by its coordinates.
+            state = state.copy(mapPick = found?.copy(lat = at.lat, lon = at.lon) ?: Place("Dropped pin", coords, at.lat, at.lon))
+        }
+    }
+
+    fun confirmMapPick() {
+        val p = state.mapPick ?: return
+        placeJob?.cancel()
+        state = state.copy(mapPick = null)
+        if (state.pick != null) select(p) else showPlace(p)
     }
 
     fun resetNorth() {
@@ -420,7 +509,16 @@ class MapViewModel(app: Application) : AndroidViewModel(app) {
     fun openLayers() = go(Screen.Layers)
     fun openSettings() = go(Screen.Settings)
 
-    fun setLayers(layers: MapLayers) = updateSettings(state.settings.copy(layers = layers))
+    fun setLayers(layers: MapLayers) {
+        updateSettings(state.settings.copy(layers = layers))
+        if (!layers.photos) photoMarkers = emptyList()
+    }
+
+    /** Health Connect toggle; the Settings page requests the permissions first. */
+    fun setHealth(on: Boolean) {
+        updateSettings(state.settings.copy(health = on))
+        if (state.screen == Screen.Timeline) timeline.load()
+    }
 
     fun updateSettings(s: AppSettings) {
         val timelineChanged = s.timeline != state.settings.timeline
@@ -574,21 +672,22 @@ class MapViewModel(app: Application) : AndroidViewModel(app) {
             recents = store.addRecent(place), route = null, routes = emptyList(), routeError = null,
         )
         cameraChannel.trySend(CameraCommand.FlyTo(place.point, 16.0))
+        loadWeather(place.point)
     }
 
     fun onMapTap(name: String, at: LatLon) {
-        if (state.screen in setOf(Screen.Nav, Screen.Route, Screen.OfflineSelect)) return
+        if (state.screen in setOf(Screen.Nav, Screen.Route, Screen.OfflineSelect, Screen.PickOnMap)) return
         showPlace(Place(name, "", at.lat, at.lon))
     }
 
     fun onLongPress(at: LatLon) {
-        if (state.screen in setOf(Screen.Nav, Screen.OfflineSelect)) return
+        if (state.screen in setOf(Screen.Nav, Screen.OfflineSelect, Screen.PickOnMap)) return
         showPlace(Place("Dropped pin", "%.5f, %.5f".format(Locale.US, at.lat, at.lon), at.lat, at.lon), lookupName = true)
     }
 
     /** Taps on the app's own markers: "friend:<topic>", "parking", "nearby:<i>". */
     fun onMarkerTap(id: String) {
-        if (state.screen == Screen.Nav) return
+        if (state.screen in setOf(Screen.Nav, Screen.PickOnMap)) return
         when {
             id == "parking" -> state.parking?.let { showPlace(it) }
             id.startsWith("friend:") -> share.friends.firstOrNull { it.link.topic == id.removePrefix("friend:") }?.let(::openFriend)
@@ -597,7 +696,7 @@ class MapViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     fun onMeTap() {
-        if (state.screen == Screen.Nav || state.fix == null) return
+        if (state.screen in setOf(Screen.Nav, Screen.PickOnMap) || state.fix == null) return
         go(Screen.Me)
     }
 
@@ -605,6 +704,7 @@ class MapViewModel(app: Application) : AndroidViewModel(app) {
     private fun showPlace(place: Place, lookupName: Boolean = false) {
         state = state.copy(screen = Screen.Place, place = place, follow = Follow.None, route = null, routes = emptyList(), routeError = null)
         cameraChannel.trySend(CameraCommand.FlyTo(place.point, 16.5))
+        loadWeather(place.point)
         placeJob?.cancel()
         placeJob = viewModelScope.launch {
             val found = runCatching { Geocoder.reverse(place.point) }.getOrNull() ?: return@launch
@@ -619,8 +719,15 @@ class MapViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
-    fun toggleSaved(place: Place) {
-        state = state.copy(saved = store.toggleSaved(place))
+    /** Saves [place] under [name]; saving an already-saved spot renames it. */
+    fun savePlace(place: Place, name: String) {
+        val named = place.copy(name = name.trim().ifBlank { place.name })
+        state = state.copy(saved = store.save(named))
+        toast(if (state.saved.any { it.key == place.key }) "Saved as ${named.name}" else "Saved")
+    }
+
+    fun unsave(place: Place) {
+        state = state.copy(saved = store.unsave(place.key))
     }
 
     fun saveParking() {
@@ -912,24 +1019,11 @@ class MapViewModel(app: Application) : AndroidViewModel(app) {
     private fun loadElevation(route: Route) {
         elevationJob?.cancel()
         state = state.copy(routeElevation = null)
-        if (route.travel == Travel.Drive || route.isTrack) return
+        if (route.travel == Travel.Drive) return
         elevationJob = viewModelScope.launch {
             val stats = runCatching { Terrain.stats(route.points) }.getOrNull()
             if (state.route == route) state = state.copy(routeElevation = stats)
         }
-    }
-
-    /** The planned route as GPX, e.g. for a bike computer or a watch. */
-    fun exportRoute(): File? {
-        val route = state.route ?: return null
-        val dest = state.place
-        val name = "Route to ${dest?.name ?: "destination"}"
-        val body = Gpx.write(
-            name,
-            listOf(GpxTrack(name, route.travel.label.lowercase(), route.points.map { GpxPoint(it.lat, it.lon) })),
-            listOfNotNull(dest?.let { GpxWaypoint(it.name, it.address, it.lat, it.lon) }),
-        )
-        return shareableGpx(getApplication(), name, body)
     }
 
     // ---- navigation ----------------------------------------------------------------------
@@ -965,12 +1059,7 @@ class MapViewModel(app: Application) : AndroidViewModel(app) {
         limitJob?.cancel()
         Tracking.nav.value = null
         Tracking.sync(getApplication())
-        val wasTrack = state.route?.isTrack == true
-        state = state.copy(
-            screen = if (wasTrack) Screen.Map else Screen.Place,
-            nav = null, route = null, routes = emptyList(), follow = Follow.Flat, speedLimit = null,
-            place = if (wasTrack) null else state.place,
-        )
+        state = state.copy(screen = Screen.Place, nav = null, route = null, routes = emptyList(), follow = Follow.Flat, speedLimit = null)
         syncLightSensor()
     }
 
@@ -992,22 +1081,12 @@ class MapViewModel(app: Application) : AndroidViewModel(app) {
 
         val away = p.offRoute > 45 + fix.accuracy
         offRouteCount = if (away) offRouteCount + 1 else 0
-        if (t.route.isTrack) {
-            // A GPX track is the plan; don't replace it, tell the user to get back on it.
-            val offTrack = offRouteCount >= 3
-            if (offTrack && System.currentTimeMillis() - lastOffTrackWarning > 60_000) {
-                lastOffTrackWarning = System.currentTimeMillis()
-                speak("You're off the track by ${spokenDistance(p.offRoute)}")
-            }
-            state = state.copy(nav = nav.copy(progress = p, offTrack = offTrack))
-        } else {
-            if (offRouteCount >= 3 && System.currentTimeMillis() - lastReroute > 10_000) {
-                reroute(fix)
-                return
-            }
-            state = state.copy(nav = nav.copy(progress = p))
-            announce(t, p)
+        if (offRouteCount >= 3 && System.currentTimeMillis() - lastReroute > 10_000) {
+            reroute(fix)
+            return
         }
+        state = state.copy(nav = nav.copy(progress = p))
+        announce(t, p)
         publishNav()
         checkSpeedLimit(fix)
     }
@@ -1018,13 +1097,12 @@ class MapViewModel(app: Application) : AndroidViewModel(app) {
         val p = state.nav?.progress ?: return
         val step = route.steps.getOrNull(p.stepIndex)
         val remaining = route.duration * (p.remaining / route.distance.coerceAtLeast(1.0))
-        val text = if (route.isTrack) "${formatDistance(p.remaining)} left on ${route.via}" else step?.instruction.orEmpty()
         Tracking.nav.value = NavInfo(
-            instruction = text,
+            instruction = step?.instruction.orEmpty(),
             destination = state.place?.name ?: route.via,
             eta = System.currentTimeMillis() + (remaining * 1000).toLong(),
-            distance = formatDistance(if (route.isTrack) p.remaining else p.toManeuver).toString(),
-            glyph = if (route.isTrack) com.shantanu.nmaps.ui.Glyphs.Straight else step?.let { com.shantanu.nmaps.ui.glyphFor(it) },
+            distance = formatDistance(p.toManeuver).toString(),
+            glyph = step?.let { com.shantanu.nmaps.ui.glyphFor(it) },
             progress = (1 - p.remaining / route.distance.coerceAtLeast(1.0)).toFloat().coerceIn(0f, 1f),
         )
     }
@@ -1200,78 +1278,9 @@ class MapViewModel(app: Application) : AndroidViewModel(app) {
         cameraChannel.trySend(CameraCommand.Fit(listOf(LatLon(bounds.south, bounds.west), LatLon(bounds.north, bounds.east)), 100, 120))
     }
 
-    // ---- GPX tracks ----------------------------------------------------------------------
+    // ---- saved places as GPX -------------------------------------------------------------
 
-    fun openTracks() = go(Screen.Tracks)
-
-    fun importGpx(uri: Uri) {
-        leaveNav()
-        viewModelScope.launch {
-            try {
-                val result = tracks.import(uri)
-                val first = result.tracks.firstOrNull()
-                when {
-                    first != null -> openTrack(first)
-                    else -> go(Screen.Tracks)
-                }
-                toast(
-                    listOfNotNull(
-                        result.tracks.size.takeIf { it > 0 }?.let { "Imported $it track${if (it > 1) "s" else ""}" },
-                        result.waypoints.takeIf { it > 0 }?.let { "$it waypoint${if (it > 1) "s" else ""}" },
-                    ).joinToString(" and ")
-                )
-            } catch (e: Exception) {
-                if (e is CancellationException) throw e
-                toast(if (e is Gpx.InvalidGpx) e.message!! else "Couldn't read that file")
-            }
-        }
-    }
-
-    fun openTrack(track: SavedTrack) {
-        viewModelScope.launch {
-            tracks.select(track)
-            go(Screen.Track)
-            val pts = tracks.selectedPoints.map { it.latLon }
-            if (pts.size >= 2) cameraChannel.trySend(CameraCommand.Fit(pts, topDp = 100, bottomDp = 420))
-        }
-    }
-
-    fun savePendingWaypoints() {
-        var saved = state.saved
-        tracks.pendingWaypoints.forEach { w ->
-            val p = Place(w.name, w.description, w.lat, w.lon)
-            if (saved.none { it.key == p.key }) saved = store.toggleSaved(p)
-        }
-        toast("Added ${tracks.pendingWaypoints.size} places to Saved")
-        tracks.pendingWaypoints = emptyList()
-        state = state.copy(saved = saved)
-    }
-
-    /** Follow the selected GPX track with progress, ETA and off-track warnings. */
-    fun followTrack(travel: Travel) {
-        val t = tracks.selected ?: return
-        val pts = tracks.selectedPoints.map { it.latLon }
-        val stats = tracks.stats ?: return
-        if (pts.size < 2) return
-        val seconds = if (travel == Travel.Walk) stats.hikingSeconds else stats.cyclingSeconds
-        val route = Router.fromTrack(pts, t.name, travel, seconds)
-        val end = pts.last()
-        state = state.copy(place = Place(t.name, "End of track", end.lat, end.lon), route = route, routes = listOf(route), travel = travel)
-        if (state.fix == null) {
-            toast("Waiting for your location")
-            return
-        }
-        startNav()
-    }
-
-    /** Directions to where the track starts. */
-    fun directionsToTrackStart() {
-        val t = tracks.selected ?: return
-        val start = tracks.selectedPoints.firstOrNull() ?: return
-        state = state.copy(place = Place("Start of ${t.name}", "", start.lat, start.lon))
-        directions()
-    }
-
+    /** Saved places as GPX waypoints, for other map apps. */
     fun exportSaved(): File? {
         if (state.saved.isEmpty()) return null
         val body = Gpx.write("Saved places", waypoints = state.saved.map { GpxWaypoint(it.name, it.address, it.lat, it.lon) })
@@ -1333,19 +1342,6 @@ class MapViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     suspend fun exportTimelineDay(): File? = timeline.exportDay()
-
-    suspend fun trackFile(track: SavedTrack): File = tracks.exportFile(track)
-
-    fun setTrackVisible(track: SavedTrack, visible: Boolean) {
-        viewModelScope.launch { tracks.setVisible(track, visible) }
-    }
-
-    fun deleteTrack(track: SavedTrack) {
-        viewModelScope.launch {
-            tracks.delete(track)
-            go(Screen.Tracks)
-        }
-    }
 
     // ---- report a problem ----------------------------------------------------------------
 
@@ -1456,6 +1452,10 @@ class MapViewModel(app: Application) : AndroidViewModel(app) {
                     category = null, pick = null,
                 )
             }
+            Screen.PickOnMap -> {
+                placeJob?.cancel()
+                state.copy(screen = Screen.Search, mapPick = null)
+            }
             Screen.Record -> state.copy(screen = Screen.Map, finished = null, finishedTrack = emptyList())
             Screen.Place -> state.copy(screen = Screen.Map, place = null, results = if (state.category != null) state.results else emptyList())
             Screen.Route -> {
@@ -1469,13 +1469,9 @@ class MapViewModel(app: Application) : AndroidViewModel(app) {
                 return true
             }
             Screen.OfflineSelect -> state.copy(screen = Screen.Offline)
-            Screen.Track -> {
-                viewModelScope.launch { tracks.select(null) }
-                state.copy(screen = Screen.Tracks)
-            }
             Screen.Friend -> state.copy(screen = Screen.Share, friend = null)
             Screen.Report -> state.copy(screen = if (state.place != null) Screen.Place else Screen.Map, report = null)
-            Screen.Menu, Screen.Layers, Screen.Offline, Screen.Timeline, Screen.Tracks, Screen.Share, Screen.Settings, Screen.Me ->
+            Screen.Menu, Screen.Layers, Screen.Offline, Screen.Timeline, Screen.Share, Screen.Settings, Screen.Me ->
                 state.copy(screen = Screen.Map)
         }
         return true

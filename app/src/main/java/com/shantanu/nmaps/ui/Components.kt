@@ -20,7 +20,20 @@ import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.text.BasicTextField
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
@@ -200,6 +213,32 @@ fun Modifier.sheet(shape: Shape = RoundedCornerShape(28.dp)): Modifier {
         .clip(shape)
         .background(p.surface, shape)
         .border(1.dp, p.line, shape)
+}
+
+/** One-line name field in a pill with Save and Cancel, used to name a saved place. */
+@Composable
+fun NameEditor(initial: String, placeholder: String, onSave: (String) -> Unit, onCancel: () -> Unit, modifier: Modifier = Modifier) {
+    val p = LocalPalette.current
+    var text by remember(initial) { mutableStateOf(initial) }
+    val focus = remember { FocusRequester() }
+    LaunchedEffect(Unit) { focus.requestFocus() }
+    Column(modifier.fillMaxWidth()) {
+        Box(Modifier.fillMaxWidth().background(p.surfaceRaised, CircleShape).padding(horizontal = 16.dp, vertical = 10.dp)) {
+            if (text.isEmpty()) NText(placeholder, NType.body, color = p.muted)
+            BasicTextField(
+                text, { text = it.take(60) }, singleLine = true,
+                textStyle = NType.body.copy(color = p.content), cursorBrush = SolidColor(p.red),
+                keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Words, imeAction = ImeAction.Done),
+                keyboardActions = KeyboardActions(onDone = { onSave(text) }),
+                modifier = Modifier.fillMaxWidth().focusRequester(focus),
+            )
+        }
+        Spacer(Modifier.height(8.dp))
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            Pill("Save", { onSave(text) }, style = PillStyle.Filled, height = 38.dp, glyph = Glyphs.StarOn)
+            Pill("Cancel", onCancel, height = 38.dp)
+        }
+    }
 }
 
 /** Dotted rule used as the sheet grab handle and as a divider. */
