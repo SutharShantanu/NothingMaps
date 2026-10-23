@@ -12,6 +12,7 @@ import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.runtime.snapshotFlow
 import androidx.lifecycle.lifecycleScope
 import kotlinx.coroutines.launch
+import com.shantanu.nmaps.data.AppLinks
 import com.shantanu.nmaps.data.LatLon
 import com.shantanu.nmaps.data.parseCoordinates
 import com.shantanu.nmaps.share.ShareLink
@@ -50,7 +51,7 @@ class MainActivity : ComponentActivity() {
         intent ?: return
         val data = intent.data
         when {
-            data?.scheme == "nmaps" -> vm.addFriend(data.toString())
+            data != null && (data.scheme == "nmaps" || data.host == AppLinks.HOST) -> openOurs(data.toString())
             data?.scheme == "geo" -> openGeo(data)
             intent.action == Intent.ACTION_SEND -> {
                 val text = intent.getStringExtra(Intent.EXTRA_TEXT).orEmpty()
@@ -59,6 +60,16 @@ class MainActivity : ComponentActivity() {
                     text.isNotBlank() -> vm.searchFor(text.lineSequence().first().take(120))
                 }
             }
+        }
+    }
+
+    /** One of the app's own links: a shared place, or a live-location share. */
+    private fun openOurs(url: String) {
+        when (val t = AppLinks.parse(url)) {
+            is AppLinks.Target.Place -> vm.openGeo(t.at, t.name)
+            is AppLinks.Target.Live -> vm.addFriend(url)
+            // Older nmaps://live links carry no query; the finder still reads them.
+            null -> if (ShareLink.find(url) != null) vm.addFriend(url)
         }
     }
 

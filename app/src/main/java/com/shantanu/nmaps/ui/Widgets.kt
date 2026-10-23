@@ -211,4 +211,3 @@ fun shareFile(context: Context, file: File, mime: String = "application/gpx+xml"
     context.startActivity(Intent.createChooser(send, title))
 }
 
-fun osmLink(lat: Double, lon: Double) = "https://www.openstreetmap.org/?mlat=$lat&mlon=$lon#map=17/$lat/$lon"

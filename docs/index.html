@@ -1,0 +1,63 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Maps</title>
+<meta name="description" content="A location shared from Maps, the dot-matrix map app. Opens in the app, or get the app.">
+<style>
+  :root { --bg: #000; --fg: #fff; --muted: #8c8c8c; --red: #d71921; --line: #2c2c2c; }
+  @media (prefers-color-scheme: light) { :root { --bg: #f2f2f2; --fg: #000; --muted: #6c6c6c; --line: #e0e0e0; } }
+  html, body { margin: 0; background: var(--bg); color: var(--fg); font: 16px/1.5 "Space Grotesk", system-ui, sans-serif; }
+  main { max-width: 420px; margin: 0 auto; padding: 48px 16px; text-align: center; }
+  .pin { width: 96px; height: 96px; margin: 0 auto 24px; display: grid; grid-template-columns: repeat(9, 1fr); gap: 2px; }
+  .pin i { border-radius: 50%; background: var(--fg); } .pin i.o { background: transparent; } .pin i.r { background: var(--red); }
+  h1 { font-size: 22px; font-weight: 500; margin: 0 0 4px; } p { color: var(--muted); margin: 0 0 24px; }
+  a.btn { display: block; padding: 14px 20px; margin: 10px 0; border-radius: 999px; text-decoration: none; font-weight: 500; }
+  a.primary { background: var(--red); color: #fff; } a.secondary { border: 1px solid var(--line); color: var(--fg); }
+  small { color: var(--muted); display: block; margin-top: 24px; }
+</style>
+</head>
+<body>
+<main>
+  <div class="pin" id="pin" aria-hidden="true"></div>
+  <h1 id="title">A place shared from Maps</h1>
+  <p id="sub">Opening in Maps…</p>
+  <a class="btn primary" id="open" href="#">Open in Maps</a>
+  <a class="btn secondary" id="get" href="https://github.com/SutharShantanu/NothingMaps/releases/latest">Get Maps (latest build)</a>
+  <a class="btn secondary" id="osm" href="#" hidden>See it on OpenStreetMap</a>
+  <small>Maps is an Android app. If it isn't installed, download the APK from the latest release and open this link again.</small>
+</main>
+<script>
+  // Dot-matrix pin, same rows as the app icon.
+  var rows = ["...###...", ".#######.", "###...###", "##..r..##", "###...###", ".#######.", "..#####..", "...###...", "....#...."];
+  document.getElementById("pin").innerHTML = rows.join("").split("").map(function (c) { return "<i class=\"" + (c === "#" ? "" : c === "r" ? "r" : "o") + "\"></i>"; }).join("");
+
+  var q = location.search.replace(/^\?/, "");
+  var params = {}; q.split("&").forEach(function (p) { var i = p.indexOf("="); if (i > 0) params[p.slice(0, i)] = decodeURIComponent(p.slice(i + 1)); });
+  var releases = "https://github.com/SutharShantanu/NothingMaps/releases/latest";
+  var deep = "nmaps://open?" + q;
+  // Chrome on Android: open the app if it's there, otherwise fall through to the release page.
+  var intent = "intent://open?" + q + "#Intent;scheme=nmaps;package=com.shantanu.nmaps;S.browser_fallback_url=" + encodeURIComponent(releases) + ";end";
+  var android = /Android/i.test(navigator.userAgent);
+
+  if (params.live) {
+    document.getElementById("title").textContent = "Someone is sharing their live location";
+    document.getElementById("sub").textContent = "It's end-to-end encrypted; only Maps can show it.";
+  } else if (params.at) {
+    document.getElementById("title").textContent = params.n || "A place shared from Maps";
+    document.getElementById("sub").textContent = params.at;
+    var ll = params.at.split(",");
+    var osm = document.getElementById("osm");
+    osm.href = "https://www.openstreetmap.org/?mlat=" + ll[0] + "&mlon=" + ll[1] + "#map=17/" + ll[0] + "/" + ll[1];
+    osm.hidden = false;
+  } else {
+    document.getElementById("title").textContent = "Maps";
+    document.getElementById("sub").textContent = "A dot-matrix map app for Android.";
+    document.getElementById("open").hidden = true;
+  }
+  document.getElementById("open").href = android ? intent : deep;
+  if (android && q) setTimeout(function () { location.href = intent; }, 150);
+</script>
+</body>
+</html>

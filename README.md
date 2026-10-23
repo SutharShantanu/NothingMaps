@@ -38,7 +38,8 @@ A dot-matrix map app for Android in the Nothing OS style: monochrome tiles, red 
 - A Photos layer shows geotagged gallery pictures as round thumbnails where they were taken. Tap one for the picture, the date, address, coordinates, size and camera / exposure details, with Directions, Open and Share.
 
 **Sharing**
-- Live location shared as a link, end-to-end encrypted and relayed through ntfy.sh; follow friends' links on your own map.
+- Places and live location go out as the app's own links (`sutharshantanu.github.io/NothingMaps/?…`): they open in Maps when it's installed, and otherwise land on a page that sends people to the latest release to get it.
+- Live location is end-to-end encrypted and relayed through ntfy.sh; follow friends' links on your own map.
 
 <p align="center">
   <img src="docs/screenshots/picker.png" width="180" alt="Directions picker with Choose on map and saved places" />
@@ -67,6 +68,10 @@ A dot-matrix map app for Android in the Nothing OS style: monochrome tiles, red 
 - Speed cameras and incident reports from OpenStreetMap / community sources.
 - Wear OS turn glyphs and a home-screen widget for the next trip.
 - Localisation of the UI beyond English.
+
+## Share links
+
+`docs/index.html` is the landing page for shared links, served by GitHub Pages from the `docs/` folder of `master`. On Android it opens the app through an `intent://` link with the release page as the fallback; elsewhere it shows the place on OpenStreetMap and the download link. The app also registers `https://sutharshantanu.github.io/NothingMaps/…` and `nmaps://open?…` so links open directly once Maps is installed.
 
 ## Building
 
