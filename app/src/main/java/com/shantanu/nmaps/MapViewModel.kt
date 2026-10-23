@@ -70,6 +70,8 @@ import com.shantanu.nmaps.share.Friend
 import com.shantanu.nmaps.share.ShareController
 import com.shantanu.nmaps.timeline.TimelineCollector
 import com.shantanu.nmaps.timeline.TimelineController
+import com.shantanu.nmaps.update.Release
+import com.shantanu.nmaps.update.Updater
 import com.shantanu.nmaps.transit.TransitItinerary
 import com.shantanu.nmaps.transit.Transitous
 import com.shantanu.nmaps.transit.toRoute
@@ -107,6 +109,16 @@ const val MAX_STOPS = 5
 
 /** Marks a route computed on the phone to honour the avoid options. */
 const val OWN_ROUTE = "your settings"
+
+/** An update found on GitHub Releases and how far along getting it is. */
+data class UpdateState(
+    val release: Release,
+    /** 0..1 while downloading; null before and after. */
+    val progress: Float? = null,
+    val apk: File? = null,
+    val error: String? = null,
+    val dismissed: Boolean = false,
+)
 
 data class ReportState(val at: LatLon, val placeName: String?, val sending: Boolean = false, val sent: OsmNotes.Sent? = null, val error: String? = null)
 
@@ -181,6 +193,11 @@ data class UiState(
 
     /** "Report a problem": where, about what, and how sending went. */
     val report: ReportState? = null,
+
+    val update: UpdateState? = null,
+    val checkingUpdate: Boolean = false,
+    /** When the last update check finished, 0 when never. */
+    val updateCheckedAt: Long = 0,
 )
 
 class MapViewModel(app: Application) : AndroidViewModel(app) {
@@ -289,6 +306,8 @@ class MapViewModel(app: Application) : AndroidViewModel(app) {
         viewModelScope.launch { Tracking.endNavRequests.collect { if (tracker != null) endNav() } }
         offline.refresh()
         if (state.settings.layers.photos) viewModelScope.launch { photos.scan() }
+        // A quiet look for a newer build once per launch; the banner only shows when there is one.
+        viewModelScope.launch { onlineFlow(app).collect { if (it && state.updateCheckedAt == 0L) checkForUpdate(quiet = true) } }
         // New or deleted areas change what the on-phone engine can see.
         viewModelScope.launch {
             offline.areas.collect { list ->
@@ -1379,6 +1398,39 @@ class MapViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     suspend fun exportTimelineDay(): File? = timeline.exportDay()
+
+    // ---- app updates ---------------------------------------------------------------------
+
+    fun checkForUpdate(quiet: Boolean = false) {
+        if (state.checkingUpdate) return
+        state = state.copy(checkingUpdate = true)
+        viewModelScope.launch {
+            val found = Updater.check()
+            val keep = state.update?.takeIf { found != null && it.release.build == found.build }
+            state = state.copy(
+                checkingUpdate = false, updateCheckedAt = System.currentTimeMillis(),
+                update = keep ?: found?.let { UpdateState(it) },
+            )
+            if (!quiet) toast(if (found != null) "Build ${found.build} is available" else "You're on the latest build")
+        }
+    }
+
+    /** Downloads the APK with progress, then opens the installer. Tapping again after a download reopens it. */
+    fun installUpdate() {
+        val u = state.update ?: return
+        u.apk?.takeIf { it.exists() }?.let { Updater.install(getApplication(), it); return }
+        if (u.progress != null) return
+        state = state.copy(update = u.copy(progress = 0f, error = null, dismissed = false))
+        viewModelScope.launch {
+            val result = runCatching { Updater.download(getApplication(), u.release) { p -> state = state.copy(update = state.update?.copy(progress = p)) } }
+            state = state.copy(update = state.update?.copy(progress = null, apk = result.getOrNull(), error = result.exceptionOrNull()?.let { "Download failed. Check your connection and try again." }))
+            result.getOrNull()?.let { Updater.install(getApplication(), it) }
+        }
+    }
+
+    fun dismissUpdate() {
+        state = state.copy(update = state.update?.copy(dismissed = true))
+    }
 
     // ---- report a problem ----------------------------------------------------------------
 

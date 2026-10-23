@@ -168,6 +168,23 @@ fun SettingsScreen(vm: MapViewModel) {
         )
 
         Spacer(Modifier.height(12.dp))
+        SectionLabel("App", Modifier.padding(start = 8.dp))
+        val u = vm.state.update
+        ListRow(
+            when {
+                vm.state.checkingUpdate -> "Checking for updates…"
+                u?.progress != null -> "Downloading build ${u.release.build}: ${(u.progress * 100).toInt()}%"
+                u != null -> "Build ${u.release.build} is available. Tap to install"
+                else -> "Check for updates"
+            },
+            { if (u != null) vm.installUpdate() else vm.checkForUpdate() },
+            "Version ${com.shantanu.nmaps.BuildConfig.VERSION_NAME}, build " +
+                (if (com.shantanu.nmaps.BuildConfig.BUILD_NUMBER > 0) "${com.shantanu.nmaps.BuildConfig.BUILD_NUMBER}" else "local") +
+                (u?.release?.notes?.takeIf { it.isNotBlank() }?.let { ". ${it.lineSequence().first().take(80)}" } ?: ""),
+            Glyphs.Download,
+        )
+
+        Spacer(Modifier.height(12.dp))
         SectionLabel("About", Modifier.padding(start = 8.dp))
         NText(
             "Everything you save, record or keep in Timeline stays on this phone. Search goes to Photon, routes to " +
