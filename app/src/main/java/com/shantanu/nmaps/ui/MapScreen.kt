@@ -201,6 +201,7 @@ fun MapScreen(vm: MapViewModel) {
 
             AnimatedVisibility(!s.online && s.screen in setOf(Screen.Map, Screen.Place), enter = fadeIn(), exit = fadeOut()) { OfflineBanner() }
             CalibrationHint(vm)
+            UpdateBanner(vm)
             AnimatedVisibility(s.message != null, enter = fadeIn(), exit = fadeOut()) {
                 val shown = rememberLast(s.message) ?: ""
                 Box(Modifier.fillMaxWidth().padding(top = 8.dp), contentAlignment = Alignment.Center) {
@@ -534,6 +535,51 @@ private fun SpeedCluster(speedMs: Float, limitKmh: Int?) {
                 }
                 NText(limit.value, NType.dotMedium, color = androidx.compose.ui.graphics.Color.Black)
             }
+        }
+    }
+}
+
+/** "Build 42 is out": one tap downloads and installs it; the × hides it until the next launch. */
+@Composable
+private fun UpdateBanner(vm: MapViewModel) {
+    val s = vm.state
+    val u = s.update
+    val show = u != null && !u.dismissed && s.screen in setOf(Screen.Map, Screen.Place)
+    AnimatedVisibility(show, enter = fadeIn(), exit = fadeOut()) {
+        val p = LocalPalette.current
+        val up = rememberLast(u) ?: return@AnimatedVisibility
+        Row(
+            Modifier
+                .padding(top = 8.dp)
+                .fillMaxWidth()
+                .pressable(RoundedCornerShape(20.dp), "Update Maps", vm::installUpdate)
+                .background(p.surface, RoundedCornerShape(20.dp))
+                .padding(start = 18.dp, end = 8.dp, top = 8.dp, bottom = 8.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            DotIcon(Glyphs.Download, Modifier.size(18.dp))
+            Spacer(Modifier.width(12.dp))
+            Column(Modifier.weight(1f)) {
+                NText(
+                    when {
+                        up.progress != null -> "Downloading build ${up.release.build}…"
+                        up.apk != null -> "Build ${up.release.build} downloaded"
+                        else -> "Maps build ${up.release.build} is out"
+                    },
+                    NType.bodyStrong,
+                )
+                NText(
+                    when {
+                        up.error != null -> up.error
+                        up.progress != null -> "${(up.progress * 100).toInt()}% of ${"%.0f".format(up.release.apkBytes / 1_048_576.0)} MB"
+                        up.apk != null -> "Tap to install"
+                        else -> "Tap to download and install"
+                    },
+                    NType.caption, color = if (up.error != null) p.red else p.muted,
+                )
+                if (up.progress != null) DottedProgress(up.progress, Modifier.padding(top = 6.dp, end = 8.dp))
+            }
+            RoundButton(Glyphs.Close, "Not now", vm::dismissUpdate, Modifier.size(40.dp), iconModifier = Modifier.size(12.dp))
         }
     }
 }

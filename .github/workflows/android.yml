@@ -33,11 +33,24 @@ jobs:
 
       - uses: gradle/actions/setup-gradle@v4
 
+      # The same key every build, so the in-app updater can install over the previous one.
+      - name: Signing key
+        if: env.KEYSTORE_B64 != ''
+        env:
+          KEYSTORE_B64: ${{ secrets.NMAPS_KEYSTORE_B64 }}
+        run: |
+          echo "$KEYSTORE_B64" | base64 -d > "$RUNNER_TEMP/nmaps.keystore"
+          echo "NMAPS_KEYSTORE=$RUNNER_TEMP/nmaps.keystore" >> "$GITHUB_ENV"
+
       - name: Unit tests
-        run: ./gradlew :app:testDebugUnitTest --no-daemon --console=plain
+        run: ./gradlew :app:testDebugUnitTest --no-daemon --console=plain -PbuildNumber=${{ github.run_number }}
 
       - name: Build APKs
-        run: ./gradlew :app:assembleDebug :app:assembleRelease --no-daemon --console=plain
+        env:
+          NMAPS_KEYSTORE_PASSWORD: ${{ secrets.NMAPS_KEYSTORE_PASSWORD }}
+          NMAPS_KEY_ALIAS: ${{ secrets.NMAPS_KEY_ALIAS }}
+          NMAPS_KEY_PASSWORD: ${{ secrets.NMAPS_KEY_PASSWORD }}
+        run: ./gradlew :app:assembleDebug :app:assembleRelease --no-daemon --console=plain -PbuildNumber=${{ github.run_number }}
 
       - name: Name the APKs after the build
         run: |

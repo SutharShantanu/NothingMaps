@@ -69,6 +69,10 @@ A dot-matrix map app for Android in the Nothing OS style: monochrome tiles, red 
 - Wear OS turn glyphs and a home-screen widget for the next trip.
 - Localisation of the UI beyond English.
 
+## Updates
+
+The app checks GitHub Releases on launch (and from Settings → App → Check for updates). When a newer build exists it shows a banner; one tap downloads the APK inside the app and opens the installer. Builds are numbered by the CI run (`v1.0.0-build.N`), and every build is signed with the same key (repository secret `NMAPS_KEYSTORE_B64`, plus `NMAPS_KEYSTORE_PASSWORD`, `NMAPS_KEY_ALIAS`, `NMAPS_KEY_PASSWORD`) so updates install over each other.
+
 ## Share links
 
 `docs/index.html` is the landing page for shared links, served by GitHub Pages from the `docs/` folder of `master`. On Android it opens the app through an `intent://` link with the release page as the fallback; elsewhere it shows the place on OpenStreetMap and the download link. The app also registers `https://sutharshantanu.github.io/NothingMaps/…` and `nmaps://open?…` so links open directly once Maps is installed.
