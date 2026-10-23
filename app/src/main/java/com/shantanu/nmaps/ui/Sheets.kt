@@ -47,6 +47,7 @@ import androidx.compose.ui.window.PopupProperties
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.unit.dp
 import com.shantanu.nmaps.MapViewModel
+import com.shantanu.nmaps.data.AppLinks
 import com.shantanu.nmaps.data.Place
 import com.shantanu.nmaps.data.Travel
 import com.shantanu.nmaps.nav.distanceMeters
@@ -150,7 +151,7 @@ fun copyText(context: android.content.Context, text: String) {
 }
 
 private fun share(context: android.content.Context, place: Place) {
-    shareText(context, listOf(place.name, place.address, osmLink(place.lat, place.lon)).filter { it.isNotBlank() }.joinToString("\n"))
+    shareText(context, listOf(place.name, place.address, AppLinks.place(place.lat, place.lon, place.name)).filter { it.isNotBlank() }.joinToString("\n"))
 }
 
 /**

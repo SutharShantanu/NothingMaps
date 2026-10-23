@@ -62,6 +62,14 @@
                 <category android:name="android.intent.category.DEFAULT" />
                 <category android:name="android.intent.category.BROWSABLE" />
                 <data android:scheme="nmaps" android:host="live" />
+                <data android:scheme="nmaps" android:host="open" />
+            </intent-filter>
+            <!-- The app's own share links (places and live location), served from GitHub Pages -->
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="https" android:host="sutharshantanu.github.io" android:pathPrefix="/NothingMaps" />
             </intent-filter>
             <!-- Health Connect shows this when asked why the app wants activity data (Android 13 and below) -->
             <intent-filter>

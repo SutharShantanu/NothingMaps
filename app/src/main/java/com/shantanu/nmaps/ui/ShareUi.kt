@@ -30,6 +30,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.unit.dp
 import com.shantanu.nmaps.MapViewModel
+import com.shantanu.nmaps.data.AppLinks
 import com.shantanu.nmaps.data.LatLon
 import com.shantanu.nmaps.nav.distanceMeters
 import com.shantanu.nmaps.nav.formatDistance
@@ -94,7 +95,7 @@ fun ShareSheet(vm: MapViewModel) {
             Spacer(Modifier.height(12.dp))
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 Pill("Send current spot", {
-                    fix?.let { shareText(context, "My location: ${osmLink(it.lat, it.lon)}\ngeo:${it.lat},${it.lon}") }
+                    fix?.let { shareText(context, "My location: ${AppLinks.place(it.lat, it.lon, "My location")}\ngeo:${it.lat},${it.lon}") }
                 }, glyph = Glyphs.Pin)
                 Pill("Share live", {
                     val n = name.trim().ifEmpty { "A friend" }
@@ -130,7 +131,7 @@ private fun inviteText(name: String, until: Long, link: String, at: LatLon?): St
     return buildString {
         append("$name is sharing their live location with you until $time.\n")
         append("Open in Maps: $link\n")
-        if (at != null) append("Right now: ${osmLink(at.lat, at.lon)}")
+        if (at != null) append("Right now: ${AppLinks.place(at.lat, at.lon, name)}")
     }
 }
 
@@ -225,7 +226,7 @@ fun MeSheet(vm: MapViewModel) {
         Spacer(Modifier.height(16.dp))
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             Pill("Save parking", vm::saveParking, glyph = Glyphs.Parking)
-            Pill("Share", { shareText(context, "My location: ${osmLink(fix.lat, fix.lon)}\ngeo:${fix.lat},${fix.lon}") }, glyph = Glyphs.Share)
+            Pill("Share", { shareText(context, "My location: ${AppLinks.place(fix.lat, fix.lon, "My location")}\ngeo:${fix.lat},${fix.lon}") }, glyph = Glyphs.Share)
             Pill("Live", vm::openShare, Modifier.weight(1f), style = PillStyle.Filled)
         }
     }
