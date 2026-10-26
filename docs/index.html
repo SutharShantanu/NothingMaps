@@ -3,61 +3,117 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Maps</title>
-<meta name="description" content="A location shared from Maps, the dot-matrix map app. Opens in the app, or get the app.">
+<title>NothingMaps - Shared Location</title>
+<meta name="description" content="A location shared from NothingMaps, the dot-matrix map app for Android. Opens in the app or download the latest release.">
+<meta property="og:title" content="NothingMaps">
+<meta property="og:description" content="A location shared from NothingMaps, the dot-matrix map app for Android.">
+<meta property="og:type" content="website">
+<meta property="og:url" content="https://sutharshantanu.github.io/NothingMaps/">
+<meta name="theme-color" content="#000000">
 <style>
-  :root { --bg: #000; --fg: #fff; --muted: #8c8c8c; --red: #d71921; --line: #2c2c2c; }
-  @media (prefers-color-scheme: light) { :root { --bg: #f2f2f2; --fg: #000; --muted: #6c6c6c; --line: #e0e0e0; } }
-  html, body { margin: 0; background: var(--bg); color: var(--fg); font: 16px/1.5 "Space Grotesk", system-ui, sans-serif; }
-  main { max-width: 420px; margin: 0 auto; padding: 48px 16px; text-align: center; }
+  :root { --bg: #000; --fg: #fff; --muted: #8c8c8c; --red: #d71921; --line: #2c2c2c; --surface: #141414; }
+  @media (prefers-color-scheme: light) { :root { --bg: #f5f5f5; --fg: #000; --muted: #6c6c6c; --line: #e0e0e0; --surface: #ffffff; } }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; background: var(--bg); color: var(--fg); font: 16px/1.5 "Space Grotesk", system-ui, -apple-system, sans-serif; min-height: 100vh; }
+  main { max-width: 440px; margin: 0 auto; padding: 48px 20px; text-align: center; }
   .pin { width: 96px; height: 96px; margin: 0 auto 24px; display: grid; grid-template-columns: repeat(9, 1fr); gap: 2px; }
   .pin i { border-radius: 50%; background: var(--fg); } .pin i.o { background: transparent; } .pin i.r { background: var(--red); }
-  h1 { font-size: 22px; font-weight: 500; margin: 0 0 4px; } p { color: var(--muted); margin: 0 0 24px; }
-  a.btn { display: block; padding: 14px 20px; margin: 10px 0; border-radius: 999px; text-decoration: none; font-weight: 500; }
-  a.primary { background: var(--red); color: #fff; } a.secondary { border: 1px solid var(--line); color: var(--fg); }
-  small { color: var(--muted); display: block; margin-top: 24px; }
+  .badge { display: inline-block; font-size: 11px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--red); margin-bottom: 8px; font-weight: 600; }
+  h1 { font-size: 24px; font-weight: 600; margin: 0 0 6px; word-break: break-word; }
+  p.sub { color: var(--muted); margin: 0 0 28px; font-size: 15px; word-break: break-word; font-family: ui-monospace, monospace; }
+  .actions { display: flex; flex-direction: column; gap: 12px; margin-bottom: 24px; }
+  a.btn { display: block; padding: 14px 20px; border-radius: 999px; text-decoration: none; font-weight: 500; font-size: 15px; transition: opacity 0.15s ease, transform 0.1s ease; }
+  a.btn:active { transform: scale(0.98); }
+  a.primary { background: var(--red); color: #fff; border: 1px solid var(--red); }
+  a.secondary { border: 1px solid var(--line); color: var(--fg); background: var(--surface); }
+  .note { color: var(--muted); font-size: 13px; line-height: 1.5; margin-top: 24px; padding: 0 8px; }
+  .note a { color: var(--fg); text-decoration: underline; }
 </style>
 </head>
 <body>
 <main>
   <div class="pin" id="pin" aria-hidden="true"></div>
-  <h1 id="title">A place shared from Maps</h1>
-  <p id="sub">Opening in Maps…</p>
-  <a class="btn primary" id="open" href="#">Open in Maps</a>
-  <a class="btn secondary" id="get" href="https://github.com/SutharShantanu/NothingMaps/releases/latest">Get Maps (latest build)</a>
-  <a class="btn secondary" id="osm" href="#" hidden>See it on OpenStreetMap</a>
-  <small>Maps is an Android app. If it isn't installed, download the APK from the latest release and open this link again.</small>
+  <div class="badge" id="badge">NothingMaps</div>
+  <h1 id="title">Location shared from NothingMaps</h1>
+  <p class="sub" id="sub">Opening in Maps…</p>
+  <div class="actions">
+    <a class="btn primary" id="open" href="#">Open in Maps</a>
+    <a class="btn secondary" id="get" href="https://github.com/SutharShantanu/NothingMaps/releases/latest">Download NothingMaps (APK)</a>
+    <a class="btn secondary" id="osm" href="#" hidden>See on OpenStreetMap</a>
+  </div>
+  <p class="note" id="note">
+    NothingMaps is a dot-matrix map app for Android. If you don't have it installed yet, tap <strong>Download NothingMaps</strong> above to get the latest APK.
+  </p>
 </main>
 <script>
-  // Dot-matrix pin, same rows as the app icon.
+  // Dot-matrix pin matching app icon
   var rows = ["...###...", ".#######.", "###...###", "##..r..##", "###...###", ".#######.", "..#####..", "...###...", "....#...."];
-  document.getElementById("pin").innerHTML = rows.join("").split("").map(function (c) { return "<i class=\"" + (c === "#" ? "" : c === "r" ? "r" : "o") + "\"></i>"; }).join("");
+  document.getElementById("pin").innerHTML = rows.join("").split("").map(function (c) {
+    return "<i class=\"" + (c === "#" ? "" : c === "r" ? "r" : "o") + "\"></i>";
+  }).join("");
 
   var q = location.search.replace(/^\?/, "");
-  var params = {}; q.split("&").forEach(function (p) { var i = p.indexOf("="); if (i > 0) params[p.slice(0, i)] = decodeURIComponent(p.slice(i + 1)); });
+  var params = {};
+  if (q) {
+    q.split("&").forEach(function (p) {
+      var i = p.indexOf("=");
+      if (i > 0) params[p.slice(0, i)] = decodeURIComponent(p.slice(i + 1));
+    });
+  }
+
   var releases = "https://github.com/SutharShantanu/NothingMaps/releases/latest";
   var deep = "nmaps://open?" + q;
-  // Chrome on Android: open the app if it's there, otherwise fall through to the release page.
   var intent = "intent://open?" + q + "#Intent;scheme=nmaps;package=com.shantanu.nmaps;S.browser_fallback_url=" + encodeURIComponent(releases) + ";end";
-  var android = /Android/i.test(navigator.userAgent);
+  var isAndroid = /Android/i.test(navigator.userAgent);
+  var isChrome = /Chrome\/[.0-9]+/i.test(navigator.userAgent) && !/Version\/[.0-9]+/i.test(navigator.userAgent);
+
+  var openBtn = document.getElementById("open");
+  var getBtn = document.getElementById("get");
+  var osmBtn = document.getElementById("osm");
+  var titleEl = document.getElementById("title");
+  var subEl = document.getElementById("sub");
+  var noteEl = document.getElementById("note");
 
   if (params.live) {
-    document.getElementById("title").textContent = "Someone is sharing their live location";
-    document.getElementById("sub").textContent = "It's end-to-end encrypted; only Maps can show it.";
+    titleEl.textContent = "Live Location Sharing";
+    subEl.textContent = "End-to-end encrypted live location shared with you";
+    openBtn.textContent = "Open in Maps";
+    noteEl.innerHTML = "Live updates are end-to-end encrypted. You need <a href=\"" + releases + "\">NothingMaps</a> installed to decrypt and follow this live location.";
   } else if (params.at) {
-    document.getElementById("title").textContent = params.n || "A place shared from Maps";
-    document.getElementById("sub").textContent = params.at;
+    titleEl.textContent = params.n || "Shared Spot";
+    subEl.textContent = params.at;
     var ll = params.at.split(",");
-    var osm = document.getElementById("osm");
-    osm.href = "https://www.openstreetmap.org/?mlat=" + ll[0] + "&mlon=" + ll[1] + "#map=17/" + ll[0] + "/" + ll[1];
-    osm.hidden = false;
+    if (ll.length === 2) {
+      osmBtn.href = "https://www.openstreetmap.org/?mlat=" + ll[0].trim() + "&mlon=" + ll[1].trim() + "#map=17/" + ll[0].trim() + "/" + ll[1].trim();
+      osmBtn.hidden = false;
+    }
   } else {
-    document.getElementById("title").textContent = "Maps";
-    document.getElementById("sub").textContent = "A dot-matrix map app for Android.";
-    document.getElementById("open").hidden = true;
+    titleEl.textContent = "NothingMaps";
+    subEl.textContent = "A dot-matrix map app for Android";
+    openBtn.hidden = true;
+    getBtn.className = "btn primary";
+    noteEl.textContent = "Monochrome tiles, red route trace, offline routing, turn-by-turn navigation, and live location sharing.";
   }
-  document.getElementById("open").href = android ? intent : deep;
-  if (android && q) setTimeout(function () { location.href = intent; }, 150);
+
+  // Handle open button click
+  openBtn.href = isAndroid ? intent : deep;
+  openBtn.addEventListener("click", function(e) {
+    if (!isAndroid) {
+      // On non-Android desktop or iOS, nmaps:// will fail silently; alert or show download
+      setTimeout(function() {
+        if (!document.hidden) {
+          window.location.href = releases;
+        }
+      }, 1000);
+    }
+  });
+
+  // Safe auto-open attempt on Android Chrome
+  if (isAndroid && isChrome && q) {
+    setTimeout(function () {
+      try { location.href = intent; } catch (err) {}
+    }, 150);
+  }
 </script>
 </body>
 </html>

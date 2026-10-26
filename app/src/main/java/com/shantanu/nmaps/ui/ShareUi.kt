@@ -95,7 +95,7 @@ fun ShareSheet(vm: MapViewModel) {
             Spacer(Modifier.height(12.dp))
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 Pill("Send current spot", {
-                    fix?.let { shareText(context, "My location: ${AppLinks.place(it.lat, it.lon, "My location")}\ngeo:${it.lat},${it.lon}") }
+                    fix?.let { shareText(context, "My location: ${AppLinks.place(it.lat, it.lon, "My location")}", "Share location") }
                 }, glyph = Glyphs.Pin)
                 Pill("Share live", {
                     val n = name.trim().ifEmpty { "A friend" }
@@ -226,7 +226,7 @@ fun MeSheet(vm: MapViewModel) {
         Spacer(Modifier.height(16.dp))
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             Pill("Save parking", vm::saveParking, glyph = Glyphs.Parking)
-            Pill("Share", { shareText(context, "My location: ${AppLinks.place(fix.lat, fix.lon, "My location")}\ngeo:${fix.lat},${fix.lon}") }, glyph = Glyphs.Share)
+            Pill("Share", { shareText(context, "My location: ${AppLinks.place(fix.lat, fix.lon, "My location")}", "Share location") }, glyph = Glyphs.Share)
             Pill("Live", vm::openShare, Modifier.weight(1f), style = PillStyle.Filled)
         }
     }
