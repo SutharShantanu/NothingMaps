@@ -16,6 +16,7 @@ class UpdaterTest {
     @Test
     fun readsBuildNumberFromTag() {
         assertEquals(42, Updater.buildOf("v1.0.0-build.42"))
+        assertEquals(42, Updater.buildOf("v1.0.42"))
         assertNull(Updater.buildOf("v1.0.0"))
     }
 
@@ -26,6 +27,18 @@ class UpdaterTest {
         assertEquals("1.0.0", r.version)
         assertEquals("https://d/release.apk", r.apkUrl)
         assertEquals(20L, r.apkBytes)
+    }
+
+    @Test
+    fun parsesNewVersionTagFormat() {
+        val json = JSONObject(
+            """{"tag_name":"v1.0.42","html_url":"https://github.com/SutharShantanu/NothingMaps/releases/tag/v1.0.42","body":"Fixes",
+                "assets":[{"name":"maps-release-1.0.42.apk","size":20,"browser_download_url":"https://d/release.apk"}]}"""
+        )
+        val r = Updater.parse(json)!!
+        assertEquals(42, r.build)
+        assertEquals("1.0.42", r.version)
+        assertEquals("https://d/release.apk", r.apkUrl)
     }
 
     @Test

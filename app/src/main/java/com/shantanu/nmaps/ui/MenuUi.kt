@@ -173,8 +173,8 @@ fun SettingsScreen(vm: MapViewModel) {
         ListRow(
             when {
                 vm.state.checkingUpdate -> "Checking for updates…"
-                u?.progress != null -> "Downloading build ${u.release.build}: ${(u.progress * 100).toInt()}%"
-                u != null -> "Build ${u.release.build} is available. Tap to install"
+                u?.progress != null -> "Downloading Maps ${u.release.version}: ${(u.progress * 100).toInt()}%"
+                u != null -> "Maps ${u.release.version} is available. Tap to install"
                 else -> "Check for updates"
             },
             { if (u != null) vm.installUpdate() else vm.checkForUpdate() },

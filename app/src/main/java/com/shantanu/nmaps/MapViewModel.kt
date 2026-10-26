@@ -1411,7 +1411,7 @@ class MapViewModel(app: Application) : AndroidViewModel(app) {
                 checkingUpdate = false, updateCheckedAt = System.currentTimeMillis(),
                 update = keep ?: found?.let { UpdateState(it) },
             )
-            if (!quiet) toast(if (found != null) "Build ${found.build} is available" else "You're on the latest build")
+            if (!quiet) toast(if (found != null) "Maps ${found.version} is available" else "You're on the latest build")
         }
     }
 

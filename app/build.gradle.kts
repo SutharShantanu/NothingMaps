@@ -14,7 +14,7 @@ android {
         // CI passes -PbuildNumber=<run number>; the in-app updater compares it against the latest release.
         val buildNumber = (project.findProperty("buildNumber") as String?)?.toIntOrNull() ?: 0
         versionCode = maxOf(1, buildNumber)
-        versionName = "1.0.0"
+        versionName = if (buildNumber > 0) "1.0.$buildNumber" else "1.0.0"
         buildConfigField("int", "BUILD_NUMBER", "$buildNumber")
 
         // Map problem reports go to OpenStreetMap; build with -PosmApi=https://master.apis.dev.openstreetmap.org to test against the sandbox.

@@ -52,8 +52,13 @@ object Updater {
         )
     }
 
-    /** "v1.0.0-build.42" → 42. */
-    fun buildOf(tag: String): Int? = Regex("""-build\.(\d+)$""").find(tag)?.groupValues?.get(1)?.toIntOrNull()
+    /** "v1.0.0-build.42" → 42, "v1.0.42" → 42. */
+    fun buildOf(tag: String): Int? {
+        Regex("""-build\.(\d+)$""").find(tag)?.groupValues?.get(1)?.toIntOrNull()?.let { return it }
+        Regex("""\.([1-9]\d*)$""").find(tag)?.groupValues?.get(1)?.toIntOrNull()?.let { return it }
+        Regex("""^v?([1-9]\d*)$""").find(tag)?.groupValues?.get(1)?.toIntOrNull()?.let { return it }
+        return null
+    }
 
     /** Downloads the APK into the shareable cache folder, reporting 0..1 as it goes. */
     suspend fun download(context: Context, release: Release, progress: (Float) -> Unit): File = withContext(Dispatchers.IO) {

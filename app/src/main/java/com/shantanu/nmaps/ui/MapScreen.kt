@@ -562,9 +562,9 @@ private fun UpdateBanner(vm: MapViewModel) {
             Column(Modifier.weight(1f)) {
                 NText(
                     when {
-                        up.progress != null -> "Downloading build ${up.release.build}…"
-                        up.apk != null -> "Build ${up.release.build} downloaded"
-                        else -> "Maps build ${up.release.build} is out"
+                        up.progress != null -> "Downloading Maps ${up.release.version}…"
+                        up.apk != null -> "Maps ${up.release.version} downloaded"
+                        else -> "Maps ${up.release.version} is out"
                     },
                     NType.bodyStrong,
                 )
