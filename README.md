@@ -38,7 +38,7 @@ A dot-matrix map app for Android in the Nothing OS style: monochrome tiles, red 
 - A Photos layer shows geotagged gallery pictures as round thumbnails where they were taken. Tap one for the picture, the date, address, coordinates, size and camera / exposure details, with Directions, Open and Share.
 
 **Sharing**
-- Places and live location go out as the app's own links (`sutharshantanu.github.io/NothingMaps/?…`): they open in Maps when it's installed, and otherwise land on a page that sends people to the latest release to get it.
+- Places and live location go out as the app's own links (`https://github.com/SutharShantanu/NothingMaps/releases/latest?…`): they open in Maps when it's installed, and otherwise land directly on the repo's latest release to download the APK.
 - Live location is end-to-end encrypted and relayed through ntfy.sh; follow friends' links on your own map.
 
 <p align="center">
@@ -75,7 +75,7 @@ The app checks GitHub Releases on launch (and from Settings → App → Check fo
 
 ## Share links
 
-`docs/index.html` is the landing page for shared links, served by GitHub Pages from the `docs/` folder of `master`. On Android it opens the app through an `intent://` link with the release page as the fallback; elsewhere it shows the place on OpenStreetMap and the download link. The app also registers `https://sutharshantanu.github.io/NothingMaps/…` and `nmaps://open?…` so links open directly once Maps is installed.
+Share links point directly to the repository's latest release (`https://github.com/SutharShantanu/NothingMaps/releases/latest?…`) and custom deep link scheme (`nmaps://open?…`). When NothingMaps is installed on Android, links open directly in the app. Otherwise, clicking the link in any browser opens the repository's latest release page on GitHub to download the latest APK build.
 
 ## Building
 

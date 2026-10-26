@@ -51,7 +51,7 @@ class MainActivity : ComponentActivity() {
         intent ?: return
         val data = intent.data
         when {
-            data != null && (data.scheme == "nmaps" || data.host == AppLinks.HOST) -> openOurs(data.toString())
+            data != null && (data.scheme == "nmaps" || data.host == AppLinks.HOST || data.host == "sutharshantanu.github.io") -> openOurs(data.toString())
             data?.scheme == "geo" -> openGeo(data)
             intent.action == Intent.ACTION_SEND -> {
                 val text = intent.getStringExtra(Intent.EXTRA_TEXT).orEmpty()

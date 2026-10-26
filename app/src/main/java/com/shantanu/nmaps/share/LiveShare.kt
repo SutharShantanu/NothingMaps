@@ -54,7 +54,7 @@ data class ShareLink(val topic: String, val key: ByteArray) {
 
     companion object {
         // The web form, the deep-link form the page uses, and links from older builds.
-        private val pattern = Regex("""(?:nmaps://live/|nmaps://open\?live=|https://sutharshantanu\.github\.io/NothingMaps/\?live=)([A-Za-z0-9_-]{16,64})/([A-Za-z0-9_-]{43})""")
+        private val pattern = Regex("""(?:nmaps://live/|nmaps://open\?live=|https://github\.com/SutharShantanu/NothingMaps/releases/latest\?live=|https://sutharshantanu\.github\.io/NothingMaps/\?live=)([A-Za-z0-9_-]{16,64})/([A-Za-z0-9_-]{43})""")
 
         fun new(): ShareLink {
             // 128 random bits for the topic: unguessable, so nobody stumbles onto it.

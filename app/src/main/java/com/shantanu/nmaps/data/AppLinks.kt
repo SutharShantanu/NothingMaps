@@ -6,14 +6,14 @@ import java.net.URLEncoder
 import java.util.Locale
 
 /**
- * The app's own share links. They point at a small page on GitHub Pages that opens the app when
- * it's installed and otherwise sends the person to the latest release to download it.
+ * The app's own share links. They point directly to the repo's latest release on GitHub,
+ * opening in the app when installed or directing to the release APK download in the browser.
  */
 object AppLinks {
-    const val HOST = "sutharshantanu.github.io"
-    const val PATH = "/NothingMaps/"
-    const val BASE = "https://$HOST$PATH"
-    const val RELEASES = "https://github.com/SutharShantanu/NothingMaps/releases/latest"
+    const val HOST = "github.com"
+    const val PATH = "/SutharShantanu/NothingMaps"
+    const val RELEASES = "https://$HOST$PATH/releases/latest"
+    const val BASE = RELEASES
 
     sealed interface Target {
         data class Place(val at: LatLon, val name: String?) : Target
@@ -39,7 +39,7 @@ object AppLinks {
         return null
     }
 
-    fun isOurs(url: String) = url.contains(HOST + PATH) || url.startsWith("nmaps://open")
+    fun isOurs(url: String) = url.contains(HOST + PATH) || url.startsWith("nmaps://open") || url.contains("sutharshantanu.github.io/NothingMaps")
 
     private fun encode(s: String) = URLEncoder.encode(s, "UTF-8").replace("+", "%20")
     private fun decode(s: String) = runCatching { URLDecoder.decode(s, "UTF-8") }.getOrDefault(s)

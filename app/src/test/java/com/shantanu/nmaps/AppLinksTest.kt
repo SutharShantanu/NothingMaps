@@ -11,7 +11,7 @@ class AppLinksTest {
     @Test
     fun placeLinkRoundTrips() {
         val url = AppLinks.place(28.44361, 77.10173, "G Town Wines & Co")
-        assertTrue(url.startsWith("https://sutharshantanu.github.io/NothingMaps/?at=28.44361,77.10173&n="))
+        assertTrue(url.startsWith("https://github.com/SutharShantanu/NothingMaps/releases/latest?at=28.44361,77.10173&n="))
         val t = AppLinks.parse(url) as AppLinks.Target.Place
         assertEquals(28.44361, t.at.lat, 1e-6)
         assertEquals(77.10173, t.at.lon, 1e-6)
