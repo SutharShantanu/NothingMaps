@@ -2,7 +2,11 @@ package com.shantanu.nmaps.ui
 
 import android.content.Intent
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
 import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
@@ -112,18 +116,27 @@ fun PlaceSheet(vm: MapViewModel) {
             )
             Pill("Share", { share(context, place) }, glyph = Glyphs.Share)
         }
-        AnimatedVisibility(naming, enter = expandVertically(), exit = shrinkVertically()) {
+        AnimatedVisibility(
+            naming,
+            enter = expandVertically(spring(dampingRatio = 0.82f, stiffness = Spring.StiffnessMediumLow)) + fadeIn(tween(180)),
+            exit = shrinkVertically(spring(dampingRatio = 0.82f, stiffness = Spring.StiffnessMediumLow)) + fadeOut(tween(140)),
+        ) {
             NameEditor(
-                savedAs?.name ?: place.name, "Name this place",
-                onSave = { vm.savePlace(place, it); naming = false },
+                initial = savedAs?.name ?: place.name,
+                placeholder = "Name this place",
+                initialCategory = savedAs?.category ?: Place.CATEGORY_FAVORITES,
+                onSave = { name -> vm.savePlace(place, name); naming = false },
+                onSaveWithCategory = { name, cat -> vm.savePlace(place, name, cat); naming = false },
                 onCancel = { naming = false },
-                Modifier.padding(top = 12.dp),
+                modifier = Modifier.padding(top = 12.dp),
             )
         }
-        if (savedAs != null && savedAs.name != place.name) {
-            NText("Saved as “${savedAs.name}”. Hold Saved to rename.", NType.caption, Modifier.padding(top = 8.dp), color = p.muted)
+        if (savedAs != null) {
+            val label = if (savedAs.name != place.name) "Saved in ${savedAs.category} as “${savedAs.name}”. Hold Saved to edit."
+            else "Saved in ${savedAs.category}. Hold Saved to edit."
+            NText(label, NType.caption, Modifier.padding(top = 8.dp), color = p.muted)
         } else if (saved) {
-            NText("Hold Saved to rename.", NType.caption, Modifier.padding(top = 8.dp), color = p.muted)
+            NText("Hold Saved to edit.", NType.caption, Modifier.padding(top = 8.dp), color = p.muted)
         }
         Spacer(Modifier.height(12.dp))
         Row(verticalAlignment = Alignment.CenterVertically) {

@@ -9,16 +9,40 @@ data class Place(
     val address: String,
     val lat: Double,
     val lon: Double,
+    val category: String = CATEGORY_FAVORITES,
 ) {
     val point get() = LatLon(lat, lon)
 
     /** Places are identified by position; two results within ~1 m are the same place. */
     val key get() = "%.5f,%.5f".format(java.util.Locale.US, lat, lon)
 
-    fun toJson() = JSONObject().put("name", name).put("address", address).put("lat", lat).put("lon", lon)
+    fun toJson() = JSONObject()
+        .put("name", name)
+        .put("address", address)
+        .put("lat", lat)
+        .put("lon", lon)
+        .put("category", category)
 
     companion object {
-        fun fromJson(o: JSONObject) = Place(o.getString("name"), o.optString("address"), o.getDouble("lat"), o.getDouble("lon"))
+        const val CATEGORY_FAVORITES = "Favorites"
+        const val CATEGORY_WANT_TO_GO = "Want to go"
+        const val CATEGORY_FOOD = "Food & Drink"
+        const val CATEGORY_PLACES = "Places"
+
+        val STANDARD_CATEGORIES = listOf(
+            CATEGORY_FAVORITES,
+            CATEGORY_WANT_TO_GO,
+            CATEGORY_FOOD,
+            CATEGORY_PLACES,
+        )
+
+        fun fromJson(o: JSONObject) = Place(
+            name = o.getString("name"),
+            address = o.optString("address"),
+            lat = o.getDouble("lat"),
+            lon = o.getDouble("lon"),
+            category = o.optString("category", CATEGORY_FAVORITES),
+        )
     }
 }
 

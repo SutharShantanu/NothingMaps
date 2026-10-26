@@ -33,6 +33,24 @@ class PlacesTest {
         val city = OfflineMaps.tileCount(Bounds(28.40, 77.00, 28.49, 77.10))
         assert(city in 50..400) { "got $city" }
     }
+
+    @Test fun placeCategorySerialization() {
+        val placeDefault = com.shantanu.nmaps.data.Place("Cafe", "MG Road", 28.45, 77.08)
+        assertEquals(com.shantanu.nmaps.data.Place.CATEGORY_FAVORITES, placeDefault.category)
+        val json = placeDefault.toJson()
+        val parsed = com.shantanu.nmaps.data.Place.fromJson(json)
+        assertEquals(com.shantanu.nmaps.data.Place.CATEGORY_FAVORITES, parsed.category)
+
+        val placeWantToGo = com.shantanu.nmaps.data.Place("Museum", "Janpath", 28.61, 77.21, com.shantanu.nmaps.data.Place.CATEGORY_WANT_TO_GO)
+        val parsedWant = com.shantanu.nmaps.data.Place.fromJson(placeWantToGo.toJson())
+        assertEquals(com.shantanu.nmaps.data.Place.CATEGORY_WANT_TO_GO, parsedWant.category)
+
+        // Backwards compatibility with legacy JSON lacking 'category' field
+        val legacyJson = org.json.JSONObject("""{"name":"Legacy Spot","address":"Connaught Place","lat":28.63,"lon":77.22}""")
+        val fromLegacy = com.shantanu.nmaps.data.Place.fromJson(legacyJson)
+        assertEquals(com.shantanu.nmaps.data.Place.CATEGORY_FAVORITES, fromLegacy.category)
+        assertEquals("Legacy Spot", fromLegacy.name)
+    }
 }
 
 class InstructionsTest {

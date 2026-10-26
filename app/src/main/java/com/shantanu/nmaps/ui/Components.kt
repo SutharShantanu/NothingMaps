@@ -16,8 +16,10 @@ import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.combinedClickable
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsPressedAsState
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -215,27 +217,73 @@ fun Modifier.sheet(shape: Shape = RoundedCornerShape(28.dp)): Modifier {
         .border(1.dp, p.line, shape)
 }
 
-/** One-line name field in a pill with Save and Cancel, used to name a saved place. */
+/** One-line name field in a pill with Category chips, Save and Cancel, used to name and categorize a saved place. */
 @Composable
-fun NameEditor(initial: String, placeholder: String, onSave: (String) -> Unit, onCancel: () -> Unit, modifier: Modifier = Modifier) {
+fun NameEditor(
+    initial: String,
+    placeholder: String,
+    initialCategory: String = "Favorites",
+    categories: List<String> = listOf("Favorites", "Want to go", "Food & Drink", "Places"),
+    onSave: (String) -> Unit,
+    onSaveWithCategory: ((String, String) -> Unit)? = null,
+    onCancel: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
     val p = LocalPalette.current
     var text by remember(initial) { mutableStateOf(initial) }
+    var selectedCategory by remember(initialCategory) { mutableStateOf(initialCategory) }
     val focus = remember { FocusRequester() }
     LaunchedEffect(Unit) { focus.requestFocus() }
-    Column(modifier.fillMaxWidth()) {
+    Column(modifier.fillMaxWidth().animateContentSize(spring(dampingRatio = 0.82f, stiffness = Spring.StiffnessMediumLow))) {
         Box(Modifier.fillMaxWidth().background(p.surfaceRaised, CircleShape).padding(horizontal = 16.dp, vertical = 10.dp)) {
             if (text.isEmpty()) NText(placeholder, NType.body, color = p.muted)
             BasicTextField(
                 text, { text = it.take(60) }, singleLine = true,
                 textStyle = NType.body.copy(color = p.content), cursorBrush = SolidColor(p.red),
                 keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Words, imeAction = ImeAction.Done),
-                keyboardActions = KeyboardActions(onDone = { onSave(text) }),
+                keyboardActions = KeyboardActions(onDone = {
+                    if (onSaveWithCategory != null) onSaveWithCategory(text, selectedCategory) else onSave(text)
+                }),
                 modifier = Modifier.fillMaxWidth().focusRequester(focus),
             )
         }
         Spacer(Modifier.height(8.dp))
+        Row(
+            horizontalArrangement = Arrangement.spacedBy(6.dp),
+            modifier = Modifier
+                .fillMaxWidth()
+                .horizontalScroll(rememberScrollState())
+                .padding(vertical = 2.dp),
+        ) {
+            categories.forEach { cat ->
+                val active = cat == selectedCategory
+                val glyph = when (cat) {
+                    "Favorites" -> Glyphs.StarOn
+                    "Want to go" -> Glyphs.Bookmark
+                    "Food & Drink" -> Glyphs.Food
+                    else -> Glyphs.Pin
+                }
+                Pill(
+                    text = cat,
+                    onClick = { selectedCategory = cat },
+                    style = if (active) PillStyle.Filled else PillStyle.Tonal,
+                    glyph = glyph,
+                    height = 34.dp,
+                )
+            }
+        }
+        Spacer(Modifier.height(10.dp))
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            Pill("Save", { onSave(text) }, style = PillStyle.Filled, height = 38.dp, glyph = Glyphs.StarOn)
+            Pill(
+                "Save",
+                {
+                    if (onSaveWithCategory != null) onSaveWithCategory(text, selectedCategory)
+                    else onSave(text)
+                },
+                style = PillStyle.Filled,
+                height = 38.dp,
+                glyph = Glyphs.Check,
+            )
             Pill("Cancel", onCancel, height = 38.dp)
         }
     }

@@ -29,7 +29,6 @@ import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
 import com.shantanu.nmaps.MapViewModel
 import com.shantanu.nmaps.data.BaseMap
-import com.shantanu.nmaps.data.Shortcut
 import androidx.compose.foundation.layout.size
 import com.shantanu.nmaps.health.HealthConnect
 import com.shantanu.nmaps.record.RecStatus
@@ -64,8 +63,9 @@ fun MenuScreen(vm: MapViewModel) {
     val rec by Recorder.state.collectAsState()
     val areas by vm.offline.areas.collectAsState()
     val recording = rec.status != RecStatus.Idle
+    val totalPlaces = s.saved.size + listOfNotNull(s.home, s.work).size
     Page("Maps", { vm.back() }) {
-        ListRow("Saved places", vm::openSaved, "${s.saved.size} saved", Glyphs.Star)
+        ListRow("Saved places", vm::openSaved, "$totalPlaces saved · Home, Work & Favorites", Glyphs.Star)
         ListRow("Timeline", vm::openTimeline, if (s.settings.timeline) "Your places and trips, day by day" else "Off. Turn on to keep a private location history", Glyphs.Clock)
         ListRow("Offline maps", vm::openOffline, "${areas.size} downloaded areas", Glyphs.Download)
         ListRow("Location sharing", vm::openShare,
@@ -108,18 +108,6 @@ fun SettingsScreen(vm: MapViewModel) {
             Segmented(listOf(false, true), s.imperial, { if (it) "Miles" else "Kilometres" }) { vm.updateSettings(s.copy(imperial = it)) }
         }
 
-        Spacer(Modifier.height(12.dp))
-        SectionLabel("Places", Modifier.padding(start = 8.dp))
-        listOf(Shortcut.Home to vm.state.home, Shortcut.Work to vm.state.work).forEach { (kind, place) ->
-            ListRow(
-                kind.label, { vm.changeShortcut(kind) },
-                place?.address?.ifBlank { null } ?: if (place != null) "Set" else "Not set. Tap to choose",
-                if (kind == Shortcut.Home) Glyphs.Home else Glyphs.Work,
-            ) {
-                if (place != null) RoundButton(Glyphs.Close, "Remove ${kind.label}", { vm.clearShortcut(kind) }, Modifier.size(40.dp), iconModifier = Modifier.size(12.dp))
-                else DotIcon(Glyphs.Edit, Modifier.size(16.dp), color = p.muted)
-            }
-        }
 
         Spacer(Modifier.height(12.dp))
         SectionLabel("Map controls", Modifier.padding(start = 8.dp))

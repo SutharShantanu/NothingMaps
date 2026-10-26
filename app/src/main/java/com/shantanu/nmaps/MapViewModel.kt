@@ -775,11 +775,19 @@ class MapViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
-    /** Saves [place] under [name]; saving an already-saved spot renames it. */
-    fun savePlace(place: Place, name: String) {
-        val named = place.copy(name = name.trim().ifBlank { place.name })
+    /** Saves [place] under [name] and [category]; saving an already-saved spot renames or recategorizes it. */
+    fun savePlace(place: Place, name: String = place.name, category: String = place.category) {
+        val named = place.copy(
+            name = name.trim().ifBlank { place.name },
+            category = category.trim().ifBlank { place.category },
+        )
         state = state.copy(saved = store.save(named))
         toast(if (state.saved.any { it.key == place.key }) "Saved as ${named.name}" else "Saved")
+    }
+
+    fun setPlaceCategory(place: Place, category: String) {
+        val updated = place.copy(category = category)
+        state = state.copy(saved = store.save(updated))
     }
 
     fun unsave(place: Place) {

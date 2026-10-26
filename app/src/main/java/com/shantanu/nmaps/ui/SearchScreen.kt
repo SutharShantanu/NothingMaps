@@ -49,6 +49,18 @@ import com.shantanu.nmaps.nav.formatDistance
 import com.shantanu.nmaps.ui.theme.LocalPalette
 import com.shantanu.nmaps.ui.theme.NType
 
+val Category.glyph: DotGlyph get() = when (this) {
+    Category.Food -> Glyphs.Food
+    Category.Fuel -> Glyphs.Fuel
+    Category.Charging -> Glyphs.Charging
+    Category.Atm -> Glyphs.Atm
+    Category.Pharmacy -> Glyphs.Pharmacy
+    Category.Hospital -> Glyphs.Hospital
+    Category.Parking -> Glyphs.Parking
+    Category.Toilets -> Glyphs.Toilets
+    Category.Grocery -> Glyphs.Grocery
+}
+
 @Composable
 fun SearchScreen(vm: MapViewModel) {
     val s = vm.state
@@ -125,7 +137,7 @@ fun SearchScreen(vm: MapViewModel) {
                 item {
                     LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.padding(bottom = 16.dp)) {
                         items(Category.entries) { c ->
-                            Pill(c.label, { vm.searchNearby(c) }, style = if (s.category == c) PillStyle.Filled else PillStyle.Tonal, height = 40.dp)
+                            Pill(c.label, { vm.searchNearby(c) }, style = if (s.category == c) PillStyle.Filled else PillStyle.Tonal, glyph = c.glyph, height = 40.dp)
                         }
                     }
                 }
@@ -181,7 +193,7 @@ private fun LazyListScope.message(text: String) {
 }
 
 @Composable
-private fun PlaceRow(place: Place, glyph: DotGlyph, fix: Fix?, modifier: Modifier = Modifier, onClick: () -> Unit) {
+internal fun PlaceRow(place: Place, glyph: DotGlyph, fix: Fix?, modifier: Modifier = Modifier, onClick: () -> Unit) {
     val p = LocalPalette.current
     Column(modifier.fillMaxWidth().pressable(RoundedCornerShape(16.dp), onClick = onClick)) {
         Row(Modifier.padding(vertical = 14.dp), verticalAlignment = Alignment.CenterVertically) {
@@ -200,46 +212,4 @@ private fun PlaceRow(place: Place, glyph: DotGlyph, fix: Fix?, modifier: Modifie
     }
 }
 
-@Composable
-fun SavedScreen(vm: MapViewModel) {
-    val s = vm.state
-    val p = LocalPalette.current
-    Column(
-        Modifier
-            .fillMaxSize()
-            .background(p.background)
-            .windowInsetsPadding(WindowInsets.safeDrawing)
-            .padding(horizontal = 12.dp, vertical = 8.dp)
-    ) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            RoundButton(Glyphs.Back, "Back", { vm.back() }, Modifier.size(56.dp))
-            Spacer(Modifier.width(16.dp))
-            NText("SAVED", NType.dotLarge, Modifier.weight(1f))
-            if (s.saved.isNotEmpty()) {
-                val context = androidx.compose.ui.platform.LocalContext.current
-                Pill("GPX", { vm.exportSaved()?.let { shareFile(context, it, title = "Export saved places") } }, glyph = Glyphs.Share, height = 40.dp)
-            }
-        }
-        Spacer(Modifier.height(20.dp))
-        LazyColumn(Modifier.fillMaxSize().padding(horizontal = 8.dp)) {
-            if (s.saved.isEmpty()) {
-                item { EmptyState(Glyphs.Star, "Nothing saved", "Open any place and tap Save to keep it here, one tap away.") }
-            } else {
-                items(s.saved, key = { it.key }) { place ->
-                    var renaming by remember(place.key) { mutableStateOf(false) }
-                    Column(Modifier.animateItem()) {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Box(Modifier.weight(1f)) { PlaceRow(place, Glyphs.StarOn, s.fix) { vm.select(place) } }
-                            RoundButton(Glyphs.Edit, "Rename ${place.name}", { renaming = !renaming }, Modifier.padding(start = 8.dp).size(40.dp), iconModifier = Modifier.size(14.dp))
-                            RoundButton(Glyphs.Close, "Remove ${place.name}", { vm.unsave(place) }, Modifier.padding(start = 8.dp).size(40.dp), iconModifier = Modifier.size(12.dp))
-                        }
-                        if (renaming) {
-                            NameEditor(place.name, "Name this place", onSave = { vm.savePlace(place, it); renaming = false }, onCancel = { renaming = false },
-                                Modifier.padding(start = 34.dp, top = 4.dp, bottom = 12.dp))
-                        }
-                    }
-                }
-            }
-        }
-    }
-}
+
